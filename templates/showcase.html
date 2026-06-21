@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Top 5 Cards Showcase - The Magicvault{% endblock %}
+{% block title %}Top 10 Cards Showcase - The Magicvault{% endblock %}
 
 {% block extra_head %}
     <!-- OpenGraph Rich Embed Previews -->
     <meta property="og:title" content="{{ showcase_user.username }}'s Magicvault Elite Showcase">
-    <meta property="og:description" content="Check out the top 5 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of their library)">
+    <meta property="og:description" content="Check out the top 10 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of their library)">
     <meta property="og:type" content="website">
     {% if cards and cards[0].image_url %}
         <meta property="og:image" content="{{ cards[0].image_url }}">
     {% endif %}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ showcase_user.username }}'s Magicvault Elite Showcase">
-    <meta name="twitter:description" content="Check out the top 5 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}!">
+    <meta name="twitter:description" content="Check out the top 10 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}!">
 {% endblock %}
 
 {% block content %}
@@ -563,7 +563,7 @@
 <div class="showcase-header">
     <h1 class="showcase-title">⚜️ {{ showcase_user.username }}'s Elite Showcase ⚜️</h1>
     <p class="showcase-subtitle">
-        A real-time public showcase of the top 5 most valuable Magic: The Gathering cards in {{ showcase_user.username }}'s personal collection. 
+        A real-time public showcase of the top 10 most valuable Magic: The Gathering cards in {{ showcase_user.username }}'s personal collection. 
         As new cards are summoned, this collection dynamically updates to reflect the highest tier items.
     </p>
     <div style="display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 16px;">
@@ -615,7 +615,7 @@
             <span class="showcase-stat-label">Total Qty</span>
             <span class="showcase-stat-value">{{ total_qty }} Cards</span>
         </div>
-        <div class="showcase-stat-card" title="Percentage of total library value held by these 5 cards">
+        <div class="showcase-stat-card" title="Percentage of total library value held by these 10 cards">
             <span class="showcase-stat-label">Concentration</span>
             <span class="showcase-stat-value" style="color: var(--accent-purple); text-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.3);">{{ "%.1f"|format(concentration) }}%</span>
         </div>

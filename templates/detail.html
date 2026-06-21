@@ -64,10 +64,13 @@
     
     <div class="detail-info">
         <h1 style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">{{ card.name }}</h1>
-        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 24px;">
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 24px; flex-wrap: wrap;">
             <span class="badge badge-{{ card.rarity|lower }}">{{ card.rarity|capitalize }}</span>
             {% if card.is_foil %}
                 <span class="badge foil-badge">Foil</span>
+            {% endif %}
+            {% if card.condition %}
+                <span class="badge condition-{{ card.condition|lower|replace(' ', '-') }}">{{ card.condition }}</span>
             {% endif %}
             {% if card.is_commander_candidate %}
                 <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Can be your Commander">👑 Commander</span>
@@ -82,6 +85,10 @@
             <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Collector Number</td>
                 <td style="border: none; padding: 8px 0; font-family: monospace; font-size: 1.1rem;">{{ card.collector_number or '?' }}</td>
+            </tr>
+            <tr>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Condition</td>
+                <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600;">{{ card.condition or 'Near Mint' }}</td>
             </tr>
             <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Price (USD)</td>

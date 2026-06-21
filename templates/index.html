@@ -649,7 +649,7 @@
         z-index: 5;
     }
 
-    #summonDrawer input[type="text"] {
+    #summonDrawer input[type="text"], #summonDrawer select {
         padding: 8px 12px;
         font-size: 0.85rem;
         border-radius: 8px;
@@ -659,10 +659,17 @@
         outline: none;
         max-width: 140px;
         width: 100%;
+        height: 36px;
+        box-sizing: border-box;
         transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    #summonDrawer input[type="text"]:focus {
+    #summonDrawer select {
+        max-width: 160px;
+        cursor: pointer;
+    }
+
+    #summonDrawer input[type="text"]:focus, #summonDrawer select:focus {
         border-color: var(--accent-purple);
         box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
     }
@@ -680,12 +687,47 @@
         color: var(--accent-cyan) !important;
         box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
     }
+
+    .page-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--panel-border);
+        color: var(--text-main);
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        user-select: none;
+    }
+    .page-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: var(--accent-purple);
+        color: var(--accent-purple);
+        transform: translateY(-2px);
+    }
+    .page-btn.active {
+        background: var(--accent-purple);
+        border-color: var(--accent-purple);
+        color: white;
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+    }
+    .page-btn.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
 </style>
 
 <div class="collection-header">
     <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
         <h1 style="margin: 0;">My Magicvault Collection</h1>
-        <a href="/showcase/{{ session.get('username') }}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; height: 26px; text-decoration: none;" title="View public top 5 cards showcase" target="_blank">
+        <a href="/showcase/{{ session.get('username') }}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; height: 26px; text-decoration: none;" title="View public top 10 cards showcase" target="_blank">
             <span>🔗 Public Showcase</span>
         </a>
     </div>
@@ -775,6 +817,13 @@
                     <input type="checkbox" id="isFoilCheckbox" name="is_foil" value="y" style="width: 18px; height: 18px; cursor: pointer;">
                     <label for="isFoilCheckbox" style="color: var(--text-muted); font-size: 0.9rem; cursor: pointer;">Foil</label>
                 </div>
+                <select name="condition" title="Card Condition">
+                    <option value="Near Mint" selected>Near Mint (NM)</option>
+                    <option value="Lightly Played">Lightly Played (LP)</option>
+                    <option value="Moderately Played">Moderately Played (MP)</option>
+                    <option value="Heavily Played">Heavily Played (HP)</option>
+                    <option value="Damaged">Damaged (DMG)</option>
+                </select>
                 <button type="submit" class="btn" style="padding: 8px 16px; background: var(--accent-purple); font-size: 0.85rem; border-radius: 8px; border: none; font-weight: 700; color: #ffffff;">Summon Card</button>
             </div>
         </form>
@@ -917,6 +966,9 @@
                             {% if card.is_foil %}
                                 <span class="badge foil-badge">Foil</span>
                             {% endif %}
+                            {% if card.condition %}
+                                <span class="badge condition-{{ card.condition|lower|replace(' ', '-') }}">{{ card.condition }}</span>
+                            {% endif %}
                             {% if card.is_commander_candidate %}
                                 <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Can be your Commander">👑 Commander</span>
                             {% endif %}
@@ -937,6 +989,9 @@
             </div>
         {% endfor %}
     </div>
+    
+    <!-- Pagination controls -->
+    <div id="pagination-controls" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 30px; margin-bottom: 20px;"></div>
 {% else %}
     <div class="empty-state">
         <div class="empty-state-icon">🔮</div>
@@ -948,6 +1003,141 @@
 <script>
     const searchInput = document.getElementById('searchInput');
 
+    let currentPage = 1;
+    const cardsPerPage = 20;
+
+    function paginateCollection() {
+        const cards = Array.from(document.querySelectorAll('.card-item'));
+        
+        // Find which cards are matched by the filters
+        const matchedCards = cards.filter(card => {
+            return card.getAttribute('data-matched') === 'true';
+        });
+
+        const totalPages = Math.ceil(matchedCards.length / cardsPerPage) || 1;
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+
+        // Show/hide based on pagination slice
+        const start = (currentPage - 1) * cardsPerPage;
+        const end = start + cardsPerPage;
+
+        matchedCards.forEach((card, idx) => {
+            if (idx >= start && idx < end) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        // Update stats text
+        const statsText = document.getElementById('filterStatsText');
+        if (statsText) {
+            statsText.textContent = `Showing ${Math.min(start + 1, matchedCards.length)}-${Math.min(end, matchedCards.length)} of ${matchedCards.length} matching cards (Total: ${cards.length})`;
+        }
+
+        // Render pagination controls
+        const controls = document.getElementById('pagination-controls');
+        if (!controls) return;
+        controls.innerHTML = '';
+
+        if (totalPages <= 1) {
+            return;
+        }
+
+        // Previous button
+        const prevBtn = document.createElement('button');
+        prevBtn.className = `page-btn ${currentPage === 1 ? 'disabled' : ''}`;
+        prevBtn.innerHTML = '‹';
+        prevBtn.title = 'Previous Page';
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                paginateCollection();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+        controls.appendChild(prevBtn);
+
+        // Page numbers
+        const maxPagesToShow = 5;
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+        if (endPage - startPage < maxPagesToShow - 1) {
+            startPage = Math.max(1, endPage - maxPagesToShow + 1);
+        }
+
+        if (startPage > 1) {
+            const firstBtn = document.createElement('button');
+            firstBtn.className = 'page-btn';
+            firstBtn.textContent = '1';
+            firstBtn.addEventListener('click', () => {
+                currentPage = 1;
+                paginateCollection();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            controls.appendChild(firstBtn);
+
+            if (startPage > 2) {
+                const dots = document.createElement('span');
+                dots.textContent = '...';
+                dots.style.color = 'var(--text-muted)';
+                dots.style.padding = '0 4px';
+                controls.appendChild(dots);
+            }
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `page-btn ${p === currentPage ? 'active' : ''}`;
+            pageBtn.textContent = p;
+            pageBtn.addEventListener('click', () => {
+                currentPage = p;
+                paginateCollection();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            controls.appendChild(pageBtn);
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dots = document.createElement('span');
+                dots.textContent = '...';
+                dots.style.color = 'var(--text-muted)';
+                dots.style.padding = '0 4px';
+                controls.appendChild(dots);
+            }
+
+            const lastBtn = document.createElement('button');
+            lastBtn.className = 'page-btn';
+            lastBtn.textContent = totalPages;
+            lastBtn.addEventListener('click', () => {
+                currentPage = totalPages;
+                paginateCollection();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            controls.appendChild(lastBtn);
+        }
+
+        // Next button
+        const nextBtn = document.createElement('button');
+        nextBtn.className = `page-btn ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextBtn.innerHTML = '›';
+        nextBtn.title = 'Next Page';
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                paginateCollection();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+        controls.appendChild(nextBtn);
+    }
+
     function updateStats() {
         const totalItemsElement = document.getElementById('totalItemsCount');
         const estimatedValueElement = document.getElementById('estimatedValueAmount');
@@ -958,7 +1148,7 @@
 
         const cards = document.querySelectorAll('.card-item');
         cards.forEach(card => {
-            if (card.style.display !== 'none') {
+            if (card.getAttribute('data-matched') === 'true') {
                 const qty = parseInt(card.getAttribute('data-qty') || '0', 10);
                 const price = parseFloat(card.getAttribute('data-price') || '0.0');
                 totalQty += qty;
@@ -1134,19 +1324,16 @@
 
             // Total evaluation
             if (matchesText && matchesColor && matchesSet && matchesType && matchesRarity && matchesFoil && matchesLegality) {
-                card.style.display = 'flex';
+                card.setAttribute('data-matched', 'true');
                 visibleCount++;
             } else {
+                card.setAttribute('data-matched', 'false');
                 card.style.display = 'none';
             }
         });
 
-        // Update summary text at the bottom of drawer
-        const statsText = document.getElementById('filterStatsText');
-        if (statsText) {
-            statsText.textContent = `Showing ${visibleCount} of ${cards.length} cards`;
-        }
-
+        currentPage = 1;
+        paginateCollection();
         updateStats();
     }
 
@@ -1433,6 +1620,7 @@
         });
 
         cards.forEach(card => grid.appendChild(card));
+        paginateCollection();
     }
 
     const sortCollectionSelect = document.getElementById('sortCollectionSelect');

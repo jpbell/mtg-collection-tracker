@@ -11,6 +11,20 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 from werkzeug.security import generate_password_hash, check_password_hash
 
+def get_condition_multiplier(condition):
+    cond = (condition or '').strip().lower()
+    if cond in ['near mint', 'nm']:
+        return 1.0
+    elif cond in ['lightly played', 'lp']:
+        return 0.85
+    elif cond in ['moderately played', 'mp']:
+        return 0.70
+    elif cond in ['heavily played', 'hp']:
+        return 0.50
+    elif cond in ['damaged', 'dmg']:
+        return 0.30
+    return 1.0
+
 def scoped(model):
     return model.query.filter_by(user_id=session.get('user_id'))
 
@@ -62,6 +76,7 @@ class Card(db.Model):
     type_line = db.Column(db.String(100), nullable=True)
     colors = db.Column(db.String(50), nullable=True)
     is_illegal = db.Column(db.Boolean, default=False, server_default='0')
+    condition = db.Column(db.String(50), default='Near Mint', server_default='Near Mint')
 
     @property
     def is_commander_candidate(self):
@@ -161,6 +176,12 @@ def upgrade_database_schema():
                         conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER REFERENCES user(id)"))
                 except Exception as e:
                     print(f"Failed to alter table {table} to add user_id: {e}")
+            if table == 'card' and 'condition' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN condition VARCHAR(50) DEFAULT 'Near Mint'"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add condition: {e}")
 
 with app.app_context():
     upgrade_database_schema()
@@ -222,30 +243,33 @@ def add_card():
         set_code = d['set'].upper()
         collector_number = d['collector_number']
         is_foil = 'is_foil' in request.form
+        condition = request.form.get('condition', 'Near Mint').strip()
         
-        # 1. Look for an exact match (same set, collector #, and foil status)
-        existing_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=is_foil, user_id=session.get('user_id')).first()
+        # 1. Look for an exact match (same set, collector #, foil status, and condition)
+        existing_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=is_foil, condition=condition, user_id=session.get('user_id')).first()
         
-        # 2. Fallback: match by name, set, and foil status for legacy/seeded records that have empty/null collector numbers
+        # 2. Fallback: match by name, set, foil status, and condition for legacy/seeded records that have empty/null collector numbers
         if not existing_card:
             existing_card = Card.query.filter(
                 Card.user_id == session.get('user_id'),
                 Card.name == d['name'],
                 Card.set_code == set_code,
                 Card.is_foil == is_foil,
+                Card.condition == condition,
                 (Card.collector_number == None) | (Card.collector_number == "")
             ).first()
             if existing_card:
                 existing_card.collector_number = collector_number  # Update with the correct collector number
-
+ 
         if existing_card:
             existing_card.quantity += 1
             db.session.commit()
             record_snapshot()
-            flash(f"Increased quantity of {existing_card.name} ({'Foil' if is_foil else 'Non-Foil'}) to {existing_card.quantity} (${existing_card.price:.2f} each)!", "success")
+            flash(f"Increased quantity of {existing_card.name} ({existing_card.condition}, {'Foil' if is_foil else 'Non-Foil'}) to {existing_card.quantity} (${existing_card.price:.2f} each)!", "success")
         else:
             price_key = 'usd_foil' if is_foil else 'usd'
-            price = float(d.get('prices', {}).get(price_key) or d.get('prices', {}).get('usd') or 0.0)
+            base_price = float(d.get('prices', {}).get(price_key) or d.get('prices', {}).get('usd') or 0.0)
+            price = base_price * get_condition_multiplier(condition)
             
             mana_cost = d.get('mana_cost', '')
             cmc = int(d.get('cmc', 0.0))
@@ -271,10 +295,11 @@ def add_card():
                                 type_line=type_line,
                                 colors=colors,
                                 is_illegal=is_illegal,
-                                user_id=session.get('user_id')))
+                                user_id=session.get('user_id'),
+                                condition=condition))
             db.session.commit()
             record_snapshot()
-            flash(f"Successfully summoned {d['name']} ({'Foil' if is_foil else 'Non-Foil'}) for ${price:.2f}!", "success")
+            flash(f"Successfully summoned {d['name']} ({condition}, {'Foil' if is_foil else 'Non-Foil'}) for ${price:.2f}!", "success")
     else:
         flash(f"Failed to find card with Set '{request.form['set_code'].upper()}' and Collector Number '{request.form['collector_number']}'.", "error")
     return redirect(url_for('index'))
@@ -749,7 +774,7 @@ def refresh_prices():
             new_price_str = prices.get(price_key) or prices.get('usd')
             if new_price_str:
                 try:
-                    card.price = float(new_price_str)
+                    card.price = float(new_price_str) * get_condition_multiplier(card.condition)
                     updated_count += 1
                 except ValueError:
                     pass
@@ -2233,7 +2258,7 @@ def view_showcase(username=None):
             if not user:
                 return "No user showcases available.", 404
     
-    cards = Card.query.filter_by(user_id=user.id).order_by(Card.price.desc()).limit(5).all()
+    cards = Card.query.filter_by(user_id=user.id).order_by(Card.price.desc()).limit(10).all()
     total_qty = sum(c.quantity for c in cards)
     total_value = sum((c.price or 0.0) * c.quantity for c in cards)
     
