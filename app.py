@@ -9,16 +9,33 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
-def get_passcode():
+from werkzeug.security import generate_password_hash, check_password_hash
+
+def get_passcode_hash():
     if os.path.exists('passcode.txt'):
         try:
             with open('passcode.txt', 'r') as f:
-                return f.read().strip()
+                val = f.read().strip()
+                # Check if it is already a Werkzeug hash string
+                if val.startswith('pbkdf2:') or val.startswith('scrypt:') or val.startswith('bcrypt:'):
+                    return val
+                # Auto-upgrade plain text passcode to a cryptographic hash
+                h = generate_password_hash(val)
+                try:
+                    with open('passcode.txt', 'w') as wf:
+                        wf.write(h)
+                except:
+                    pass
+                return h
         except:
             pass
-    return os.environ.get('APP_PASSWORD', 'magicvault')
+    # Get from environment or fallback
+    plain = os.environ.get('APP_PASSWORD', 'magicvault')
+    if plain.startswith('pbkdf2:') or plain.startswith('scrypt:') or plain.startswith('bcrypt:'):
+        return plain
+    return generate_password_hash(plain)
 
-PASSWORD = get_passcode()
+PASSWORD_HASH = get_passcode_hash()
 
 @app.before_request
 def check_auth():
@@ -2055,7 +2072,7 @@ def login():
     error = None
     if request.method == 'POST':
         password = request.form.get('password')
-        if password == PASSWORD:
+        if check_password_hash(PASSWORD_HASH, password):
             session['logged_in'] = True
             return redirect(url_for('index'))
         else:
@@ -2081,14 +2098,14 @@ def view_settings():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
         
-    global PASSWORD
+    global PASSWORD_HASH
     if request.method == 'POST':
         current_password = request.form.get('current_password', '')
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
         
         # Verify current passcode
-        if current_password != PASSWORD:
+        if not check_password_hash(PASSWORD_HASH, current_password):
             flash('Current passcode is incorrect.', 'error')
             return redirect(url_for('view_settings'))
             
@@ -2102,9 +2119,10 @@ def view_settings():
             
         # Save passcode
         try:
+            h = generate_password_hash(new_password)
             with open('passcode.txt', 'w') as f:
-                f.write(new_password)
-            PASSWORD = new_password
+                f.write(h)
+            PASSWORD_HASH = h
             flash('Vault passcode updated successfully!', 'success')
         except Exception as e:
             flash(f'Failed to save new passcode: {str(e)}', 'error')

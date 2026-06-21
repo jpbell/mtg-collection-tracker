@@ -129,7 +129,7 @@ To protect your inventory database, the application requires a passcode at login
     ```bash
     export APP_PASSWORD="your_custom_passcode"
     ```
-  - **Local File Override**: Save your custom passcode directly to a `passcode.txt` text file in the project's root directory (this file is excluded from git and will take precedence).
+  - **Local File Override**: You can write a passcode to a `passcode.txt` file in the project's root directory (gitignored). For security, the app automatically hashes and replaces any plain-text passcode written to this file with a secure cryptographic hash.
 
 ---
 
