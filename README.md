@@ -75,12 +75,28 @@ Designed with a sleek, responsive dark glassmorphism user interface and backed b
 
 ### 2. Environment Installation
 Clone or navigate to the workspace directory, then configure a virtual environment:
+
+**On Linux / macOS:**
 ```bash
 # Create a virtual environment named 'venv'
 python3 -m venv venv
 
 # Activate the virtual environment
 source venv/bin/activate
+
+# Install all required Python packages
+pip install -r requirements.txt
+```
+
+**On Windows:**
+```cmd
+# Create a virtual environment named 'venv'
+python -m venv venv
+
+# Activate the virtual environment (Command Prompt)
+venv\Scripts\activate
+# Or in PowerShell:
+.\venv\Scripts\Activate.ps1
 
 # Install all required Python packages
 pip install -r requirements.txt
