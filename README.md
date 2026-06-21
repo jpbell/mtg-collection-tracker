@@ -4,6 +4,8 @@
 
 Designed with a sleek, responsive dark glassmorphism user interface and backed by a lightweight SQLite database, The Magicvault integrates directly with the **Scryfall API** for card detail resolution/pricing and **MTGJSON** for official preconstructed deck data.
 
+![The Magicvault Dashboard Preview](screenshots/dashboard.png)
+
 ---
 
 ## ⚡ Key Features
@@ -14,10 +16,14 @@ Designed with a sleek, responsive dark glassmorphism user interface and backed b
 * **Estimated Value & Analytics**: Tracks unique items and dynamic USD value of the collection over time using price snapshots.
 * **Robust Advanced Search**: Scryfall-like search filters. Type syntax queries (e.g. `type:creature`, `color:w`, `cmc>=5`, `is:foil`, `is:commander`) or general keywords (e.g. `rare instant`) to filter collection instantly client-side.
 
+![Collection Library](screenshots/mycollection.png)
+
 ### 2. 🛡️ Deck Builder & Legality Verifier
 * **Collection-Limited Building**: Restricts deck composition to cards physically in your collection. Tells you how many copies are available vs. currently committed.
 * **Format Legality Check**: Queries Scryfall to verify deck legality (Standard, Modern, Commander, Pioneer, Legacy, Pauper, Vintage). Banned or illegal cards cannot be added.
 * **Basic Land Summoner**: Instantly summon basic lands (Plains, Island, Swamp, Mountain, Forest) in bulk. It automatically adds the lands to your collection with a $0.00 price tag to preserve collection financial statistics.
+
+![Spell Decks Dashboard](screenshots/decks.png)
 
 ### 3. 📥 Preconstructed & Custom Deck Importers
 * **MTGJSON Precon Database**: Search from over **2,700+** official preconstructed decks (Commander precons, Challenger decks, early theme decks) from MTG history. Rebuilds and imports the deck with a single click.
@@ -34,6 +40,13 @@ Designed with a sleek, responsive dark glassmorphism user interface and backed b
 * **Curve & Pips Chart**: Displays a vertical bar chart of spell CMC curve and counts colored mana symbols (`{W}`, `{U}`, etc.).
 * **Type Breakdown**: Proportional progress bars indicating Creatures, Lands, Instants, Sorceries, Artifacts, Enchantments, and Planeswalkers.
 * **Playtest Simulator**: Shuffles the deck and draws a starting hand of 7 cards. Features a functional **Mulligan** button (draws one card fewer recursively) and a **Reset** button to start over.
+
+### 6. 📝 Wishlist Tracker & LGS Deal Checker
+* **Isolate Wanted Cards**: Cards in your wishlist are stored separately from your active library. You cannot add them to decks until they are officially claimed.
+* **Acquisition Estimates**: The wishlist header automatically sums up the total wanted quantities and computes the estimated USD price to purchase them.
+* **LGS Deal Checker Cockpit**: In the Wishlist page's deal checker, view live total owned/needed counts, compare local asking prices to calculate markup/discount metrics, and check compatibility with custom decks.
+
+![Wishlist Tracker](screenshots/wishlist.png)
 
 ---
 
