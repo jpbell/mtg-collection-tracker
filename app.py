@@ -641,11 +641,6 @@ def view_releases():
         releases = ReleaseNote.query.order_by(ReleaseNote.date.desc()).all()
     return render_template('releases.html', releases=releases)
 
-@app.route('/add-release', methods=['POST'])
-def add_release():
-    db.session.add(ReleaseNote(version=request.form['version'], description=request.form['description']))
-    db.session.commit()
-    return redirect(url_for('view_releases'))
 
 @app.route('/refresh_prices')
 def refresh_prices():
