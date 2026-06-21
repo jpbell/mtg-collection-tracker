@@ -2109,22 +2109,69 @@ def delete_art_card(id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if session.get('logged_in'):
+    if session.get('user_id'):
         return redirect(url_for('index'))
     error = None
     if request.method == 'POST':
+        username = request.form.get('username', '').strip()
         password = request.form.get('password')
-        if check_password_hash(PASSWORD_HASH, password):
-            session['logged_in'] = True
+        
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password_hash, password):
+            session['user_id'] = user.id
+            session['username'] = user.username
             return redirect(url_for('index'))
         else:
-            error = 'Invalid passcode. Please try again.'
+            error = 'Invalid username or password. Please try again.'
     return render_template('login.html', error=error)
 
 @app.route('/logout')
 def logout():
-    session.pop('logged_in', None)
+    session.pop('user_id', None)
+    session.pop('username', None)
     return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if session.get('user_id'):
+        return redirect(url_for('index'))
+    
+    is_first_user = (User.query.count() == 0)
+    error = None
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not username or not password:
+            error = "Username and password cannot be empty."
+        elif password != confirm_password:
+            error = "Passwords do not match."
+        elif User.query.filter_by(username=username).first():
+            error = "Username is already taken."
+        else:
+            user = User(username=username, password_hash=generate_password_hash(password))
+            db.session.add(user)
+            db.session.commit()
+            
+            # If this is the first user, auto-assign any existing orphaned records to them
+            if is_first_user:
+                first_user_id = user.id
+                Card.query.filter(Card.user_id == None).update({Card.user_id: first_user_id})
+                Deck.query.filter(Deck.user_id == None).update({Deck.user_id: first_user_id})
+                Token.query.filter(Token.user_id == None).update({Token.user_id: first_user_id})
+                ArtCard.query.filter(ArtCard.user_id == None).update({ArtCard.user_id: first_user_id})
+                ValueSnapshot.query.filter(ValueSnapshot.user_id == None).update({ValueSnapshot.user_id: first_user_id})
+                WishlistCard.query.filter(WishlistCard.user_id == None).update({WishlistCard.user_id: first_user_id})
+                db.session.commit()
+            
+            session['user_id'] = user.id
+            session['username'] = user.username
+            flash("Account created and vault unlocked!", "success")
+            return redirect(url_for('index'))
+            
+    return render_template('register.html', error=error, is_first_user=is_first_user)
 
 @app.route('/guide')
 def view_guide():
@@ -2137,50 +2184,61 @@ def view_formats():
 
 @app.route('/settings', methods=['GET', 'POST'])
 def view_settings():
-    if not session.get('logged_in'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
-    global PASSWORD_HASH
     if request.method == 'POST':
         current_password = request.form.get('current_password', '')
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
         
-        # Verify current passcode
-        if not check_password_hash(PASSWORD_HASH, current_password):
-            flash('Current passcode is incorrect.', 'error')
+        user = User.query.get(session['user_id'])
+        
+        # Verify current password
+        if not check_password_hash(user.password_hash, current_password):
+            flash('Current password is incorrect.', 'error')
             return redirect(url_for('view_settings'))
             
         if not new_password:
-            flash('New passcode cannot be empty.', 'error')
+            flash('New password cannot be empty.', 'error')
             return redirect(url_for('view_settings'))
             
         if new_password != confirm_password:
-            flash('New passcodes do not match.', 'error')
+            flash('New passwords do not match.', 'error')
             return redirect(url_for('view_settings'))
             
-        # Save passcode
+        # Save password
         try:
-            h = generate_password_hash(new_password)
-            with open('passcode.txt', 'w') as f:
-                f.write(h)
-            PASSWORD_HASH = h
-            flash('Vault passcode updated successfully!', 'success')
+            user.password_hash = generate_password_hash(new_password)
+            db.session.commit()
+            flash('Vault password updated successfully!', 'success')
         except Exception as e:
-            flash(f'Failed to save new passcode: {str(e)}', 'error')
+            flash(f'Failed to save new password: {str(e)}', 'error')
             
         return redirect(url_for('view_settings'))
         
     return render_template('settings.html')
 
 @app.route('/showcase')
-def view_showcase():
-    cards = Card.query.order_by(Card.price.desc()).limit(5).all()
+@app.route('/showcase/<username>')
+def view_showcase(username=None):
+    if username:
+        user = User.query.filter_by(username=username).first_or_404()
+    else:
+        if session.get('user_id'):
+            user = User.query.get(session['user_id'])
+        else:
+            # Fallback to the first user if not logged in and no username specified
+            user = User.query.first()
+            if not user:
+                return "No user showcases available.", 404
+    
+    cards = Card.query.filter_by(user_id=user.id).order_by(Card.price.desc()).limit(5).all()
     total_qty = sum(c.quantity for c in cards)
     total_value = sum((c.price or 0.0) * c.quantity for c in cards)
     
     # Calculate concentration percentage of total collection value
-    all_cards = scoped(Card).all()
+    all_cards = Card.query.filter_by(user_id=user.id).all()
     total_collection_val = sum((c.price or 0.0) * c.quantity for c in all_cards)
     
     concentration = 0.0
@@ -2191,6 +2249,7 @@ def view_showcase():
                            cards=cards, 
                            total_value=total_value, 
                            total_qty=total_qty, 
-                           concentration=concentration)
+                           concentration=concentration,
+                           showcase_user=user)
 
 if __name__ == '__main__': app.run(host='0.0.0.0', debug=True)
