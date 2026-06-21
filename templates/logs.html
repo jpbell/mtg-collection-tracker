@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>Audit Logs</title></head>
+<body style="font-family:sans-serif; padding:20px;">
+    <h1>Activity Log</h1>
+    <a href="/">Back to Collection</a>
+    <table border="1" style="width:100%; border-collapse:collapse; margin-top:20px;">
+        <tr><th>Timestamp</th><th>Action</th><th>Details</th></tr>
+        {% for l in logs %}
+        <tr>
+            <td>{{ l.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ l.action }}</td>
+            <td>{{ l.details }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

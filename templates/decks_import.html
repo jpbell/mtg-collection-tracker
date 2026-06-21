@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Import Deck - The Magicvault{% endblock %}
+
+{% block content %}
+<style>
+    .import-header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid rgba(var(--accent-purple-rgb), 0.2);
+        padding-bottom: 12px;
+    }
+
+    .tabs {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--panel-border);
+        padding-bottom: 12px;
+    }
+
+    .tab-btn {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--panel-border);
+        padding: 10px 20px;
+        border-radius: 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .tab-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+    }
+
+    .tab-btn.active {
+        background: var(--accent-purple);
+        border-color: var(--accent-purple);
+        color: white;
+        box-shadow: 0 4px 12px rgba(var(--accent-purple-rgb), 0.2);
+    }
+
+    .tab-content {
+        display: none;
+        animation: fadeIn 0.4s ease;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .search-container {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 12px;
+    }
+
+    .search-container input {
+        flex: 1;
+    }
+
+    .precon-list-container {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.2);
+        margin-bottom: 24px;
+    }
+
+    .precon-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+
+    .precon-item:last-child {
+        border-bottom: none;
+    }
+
+    .precon-item:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .precon-item.selected {
+        background: rgba(var(--accent-purple-rgb), 0.1);
+        border-left: 4px solid var(--accent-purple);
+        padding-left: 16px;
+    }
+
+    .precon-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .precon-name {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        color: var(--text-main);
+        font-size: 1.05rem;
+    }
+
+    .precon-meta {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 12px;
+    }
+
+    .precon-badge {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+    }
+
+    .import-btn-container {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .import-panel {
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid var(--panel-border);
+        padding: 30px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-main);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    textarea {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text-main);
+        padding: 12px;
+        font-family: monospace;
+        font-size: 0.9rem;
+        resize: vertical;
+        min-height: 200px;
+    }
+
+    textarea:focus {
+        border-color: var(--accent-purple);
+        outline: none;
+        box-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.2);
+    }
+</style>
+
+<div class="import-header">
+    <h1 style="margin: 0; border: none; padding: 0;">Import Spell Deck</h1>
+    <p style="color: var(--text-muted); margin: 4px 0 0 0; font-size: 0.95rem;">Add preconstructed or custom card lists directly to your decks and collection.</p>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('precon-tab')">Preconstructed Deck</button>
+    <button class="tab-btn" onclick="switchTab('text-tab')">Copy-Paste Decklist</button>
+</div>
+
+<!-- Tab 1: Preconstructed Deck -->
+<div id="precon-tab" class="tab-content active">
+    <div class="import-panel">
+        <h3 style="font-family: 'Cinzel', serif; margin-top: 0; margin-bottom: 8px; color: var(--accent-gold);">Summon Preconstructed Deck</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0; margin-bottom: 20px;">Search Wizards of the Coast preconstructed decks from MTG history (Commander, Theme Decks, Challenger Decks, etc.) to import.</p>
+
+        <div class="search-container">
+            <input type="text" id="preconSearch" placeholder="Search precons (e.g. Veloci-Ramp-Tor, Cavalry Charge, Necron)..." style="width: 100%;">
+        </div>
+
+        <div class="precon-list-container">
+            {% if decks_list %}
+                {% for d in decks_list %}
+                    <div class="precon-item" data-name="{{ d.name }}" data-code="{{ d.code }}" data-filename="{{ d.fileName }}" onclick="selectPrecon(this)">
+                        <div class="precon-info">
+                            <span class="precon-name">{{ d.name }}</span>
+                            <div class="precon-meta">
+                                <span>Set: <strong style="color: var(--accent-purple);">{{ d.code }}</strong></span>
+                                <span>Released: {{ d.releaseDate }}</span>
+                            </div>
+                        </div>
+                        <span class="precon-badge">{{ d.type }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+                    ⚠️ Failed to load precon database or no internet connection. Please use the Copy-Paste tab.
+                </div>
+            {% endif %}
+        </div>
+
+        <form action="/deck/import/precon" method="POST" id="preconImportForm">
+            <input type="hidden" name="file_name" id="selectedFileName" required>
+            <div class="import-btn-container">
+                <button type="submit" id="preconImportSubmit" class="btn" style="padding: 12px 28px;" disabled>
+                    <span>Import Selected Precon</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tab 2: Copy-Paste Decklist -->
+<div id="text-tab" class="tab-content">
+    <div class="import-panel">
+        <form action="/deck/import/text" method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="deck_name">Deck Name</label>
+                    <input type="text" id="deck_name" name="name" placeholder="E.g. My Custom Deck" required>
+                </div>
+                <div class="form-group">
+                    <label for="deck_format">Format</label>
+                    <select id="deck_format" name="format" required>
+                        <option value="Standard">Standard</option>
+                        <option value="Modern">Modern</option>
+                        <option value="Commander" selected>Commander (EDH)</option>
+                        <option value="Pioneer">Pioneer</option>
+                        <option value="Legacy">Legacy</option>
+                        <option value="Pauper">Pauper</option>
+                        <option value="Vintage">Vintage</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="deck_description">Description / Strategy (Optional)</label>
+                <input type="text" id="deck_description" name="description" placeholder="Notes or strategy...">
+            </div>
+
+            <div class="form-group">
+                <label for="decklist_text">Decklist (One card per line, e.g. "1 Sol Ring" or "1x Elesh Norn")</label>
+                <textarea id="decklist_text" name="decklist" placeholder="1 Pantlaza, Sun-Favored&#10;1 Wayta, Trainer Prodigy&#10;36 Mountain" required></textarea>
+            </div>
+
+            <div class="import-btn-container">
+                <button type="submit" class="btn" style="padding: 12px 28px;">
+                    <span>Import Custom List</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        event.target.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function selectPrecon(element) {
+        document.querySelectorAll('.precon-item').forEach(item => item.classList.remove('selected'));
+        element.classList.add('selected');
+
+        const fileName = element.getAttribute('data-filename');
+        document.getElementById('selectedFileName').value = fileName;
+        document.getElementById('preconImportSubmit').removeAttribute('disabled');
+    }
+
+    // Precon client-side filtering
+    const searchInput = document.getElementById('preconSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase().trim();
+            const items = document.querySelectorAll('.precon-item');
+            
+            items.forEach(item => {
+                const name = item.getAttribute('data-name').toLowerCase();
+                const code = item.getAttribute('data-code').toLowerCase();
+                
+                if (name.includes(query) || code.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    }
+</script>
+{% endblock %}

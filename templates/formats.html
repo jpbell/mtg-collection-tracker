@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block title %}MTG Formats & Rules - The Magicvault{% endblock %}
+
+{% block content %}
+<style>
+    .formats-header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid rgba(var(--accent-purple-rgb), 0.2);
+        padding-bottom: 12px;
+    }
+
+    .formats-tabs-container {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--panel-border);
+        padding-bottom: 16px;
+    }
+
+    .format-tab-btn {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--panel-border);
+        padding: 10px 18px;
+        border-radius: 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .format-tab-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        border-color: var(--accent-purple);
+    }
+
+    .format-tab-btn.active {
+        background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-hover));
+        border-color: var(--accent-purple);
+        color: white;
+        box-shadow: 0 4px 15px rgba(var(--accent-purple-hover-rgb), 0.2);
+    }
+
+    .format-content {
+        display: none;
+        animation: fadeIn 0.4s ease;
+    }
+
+    .format-content.active {
+        display: block;
+    }
+
+    .format-card {
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .format-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 16px;
+    }
+
+    .format-main-title {
+        font-family: 'Cinzel', serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--text-main);
+    }
+
+    .format-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .info-card {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 12px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-card .label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+
+    .info-card .value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .rules-section-title {
+        font-family: 'Cinzel', serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--accent-purple);
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .rules-list {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.7;
+    }
+
+    .rules-list li {
+        margin-bottom: 12px;
+    }
+
+    .rules-list li strong {
+        color: var(--text-main);
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+        .format-card {
+            padding: 20px;
+        }
+        .info-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        .format-main-title {
+            font-size: 1.4rem;
+        }
+    }
+</style>
+
+<div class="formats-header">
+    <h1 style="margin: 0; border: none; padding: 0;">MTG Format Rules</h1>
+    <p style="color: var(--text-muted); margin: 4px 0 0 0; font-size: 0.95rem;">Review construction guidelines and gameplay parameters for the most popular formats.</p>
+</div>
+
+<div class="formats-tabs-container">
+    <button class="format-tab-btn active" onclick="switchFormat('Commander')">
+        <span>🛡️ Commander</span>
+    </button>
+    <button class="format-tab-btn" onclick="switchFormat('Standard')">
+        <span>✨ Standard</span>
+    </button>
+    <button class="format-tab-btn" onclick="switchFormat('Modern')">
+        <span>🧬 Modern</span>
+    </button>
+    <button class="format-tab-btn" onclick="switchFormat('Pioneer')">
+        <span>🍂 Pioneer</span>
+    </button>
+    <button class="format-tab-btn" onclick="switchFormat('Legacy')">
+        <span>📜 Legacy</span>
+    </button>
+    <button class="format-tab-btn" onclick="switchFormat('Pauper')">
+        <span>💎 Pauper</span>
+    </button>
+    <button class="format-tab-btn" onclick="switchFormat('Vintage')">
+        <span>👑 Vintage</span>
+    </button>
+</div>
+
+<!-- Format 1: Commander -->
+<div id="Commander-content" class="format-content active">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Commander / EDH</h2>
+            <span class="format-badge" style="color: var(--accent-gold); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.1);">Commander</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">Exactly 100 Cards</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Singleton (Max 1)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">40 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">Eternal (All Sets)</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>The Commander</strong>: Choose a Legendary Creature (or specific eligible Planeswalkers) to lead your deck. The rest of the deck is placed in the Library, while your Commander begins the game in the separate <em>Command Zone</em>.</li>
+                <li><strong>Color Identity</strong>: Every card in your deck must only feature colors that appear on your Commander (including mana symbols in card text). Colorless cards can always be added.</li>
+                <li><strong>Commander Cast & Tax</strong>: You can cast your Commander from the Command Zone for its standard mana cost. Each subsequent time you cast it from the Command Zone, it costs an additional <span class="code-span">{2}</span> generic mana (known as the "Commander Tax").</li>
+                <li><strong>Commander Damage Rule</strong>: If a player is dealt 21 or more points of combat damage by a single Commander over the course of the game, that player loses the game immediately, regardless of their current life total.</li>
+                <li><strong>Multiplayer Focus</strong>: Commander is typically played in casual free-for-all games of 4 players.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Format 2: Standard -->
+<div id="Standard-content" class="format-content">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Standard</h2>
+            <span class="format-badge" style="color: var(--accent-cyan); border-color: rgba(6,182,212,0.3); background: rgba(6,182,212,0.1);">Standard</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">60+ Cards (Sideboard: up to 15)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Max 4 copies (Lands: unlimited)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">20 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">Recent Rotated Sets (~3 Years)</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>Rotational Set Pool</strong>: Standard is a dynamic format that only permits cards printed in release sets from the last three years. Older sets rotate out of legality every autumn as new sets enter the pool.</li>
+                <li><strong>Construction Guidelines</strong>: A minimum of 60 cards is required for the main deck. You may optionally build a 15-card sideboard to swap cards in between games during a match (typically best-of-three matches).</li>
+                <li><strong>Playstyle</strong>: Standard is primarily a 1-on-1 competitive format, characterized by shifts in the metagame as card rotations happen.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Format 3: Modern -->
+<div id="Modern-content" class="format-content">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Modern</h2>
+            <span class="format-badge" style="color: var(--accent-purple); border-color: rgba(var(--accent-purple-rgb),0.3); background: rgba(var(--accent-purple-rgb),0.1);">Modern</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">60+ Cards (Sideboard: up to 15)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Max 4 copies (Lands: unlimited)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">20 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">8th Edition (2003) to Present</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>Non-Rotational Set Pool</strong>: Modern is a non-rotating format, meaning cards do not leave legality unless banned. It includes all cards from <em>8th Edition</em> (the introduction of modern card frames in 2003) up to the most recent sets, plus specific Modern-direct expansion sets (e.g. Modern Horizons).</li>
+                <li><strong>Match Rules</strong>: Built for competitive 1-on-1 gameplay. Main decks must have at least 60 cards, with optional 15-card sideboards.</li>
+                <li><strong>Banlist Managed</strong>: Due to the high power level of cards printed since 2003, Wizards of the Coast actively manages a banlist to keep competitive gameplay balanced and interactive.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Format 4: Pioneer -->
+<div id="Pioneer-content" class="format-content">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Pioneer</h2>
+            <span class="format-badge" style="color: var(--accent-green); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1);">Pioneer</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">60+ Cards (Sideboard: up to 15)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Max 4 copies (Lands: unlimited)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">20 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">Return to Ravnica (2012) to Present</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>Bridge Between Standard & Modern</strong>: Pioneer is a non-rotating format designed to allow players to use cards that have rotated out of Standard but are not powerful enough to compete in Modern.</li>
+                <li><strong>Card Legality</strong>: All standard releases from <em>Return to Ravnica</em> (Autumn 2012) to the present day are legal. Direct-to-Modern sets (like Modern Horizons) are NOT legal in Pioneer.</li>
+                <li><strong>No Fetch Lands</strong>: To differentiate its gameplay and keep deck prices lower, all five original fetch lands (e.g. Polluted Delta, Flooded Strand) are banned in Pioneer.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Format 5: Legacy -->
+<div id="Legacy-content" class="format-content">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Legacy</h2>
+            <span class="format-badge" style="color: var(--accent-rose); border-color: rgba(244,63,94,0.3); background: rgba(244,63,94,0.1);">Legacy</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">60+ Cards (Sideboard: up to 15)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Max 4 copies (Lands: unlimited)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">20 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">Eternal (All Sets)</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>High Power Eternal Format</strong>: Legacy is an eternal format that allows cards from every set in MTG's history (including Commander products, supplemental draft sets, and promotional cards).</li>
+                <li><strong>Strict Banlist</strong>: While all sets are legal, exceptionally powerful cards (such as the Power Nine, Black Lotus, and fast mana artifacts) are banned entirely to prevent instant-win combinations.</li>
+                <li><strong>Strategic Complexity</strong>: Features highly complex stacks and interactions, utilizing cards like Brainstorm, Force of Will, and Wasteland to establish a deeply tactical metagame.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Format 6: Pauper -->
+<div id="Pauper-content" class="format-content">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Pauper</h2>
+            <span class="format-badge" style="color: #f472b6; border-color: rgba(244,114,182,0.3); background: rgba(244,114,182,0.1);">Pauper</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">60+ Cards (Sideboard: up to 15)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Max 4 copies (Lands: unlimited)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">20 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">Common Rarity Cards Only</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>Commons-Only Legality</strong>: Pauper is a popular non-rotating format where every single card in your main deck and sideboard must have been printed at the <em>Common</em> rarity in at least one paper or digital Magic release.</li>
+                <li><strong>Budget Competitive</strong>: Because only commons are permitted, Pauper is extremely budget-friendly while retaining an exceptionally high power level comparable to Legacy in terms of spell efficiency (e.g., Lightning Bolt, Counterspell, and Ponder are legal).</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Format 7: Vintage -->
+<div id="Vintage-content" class="format-content">
+    <div class="format-card">
+        <div class="format-title-row">
+            <h2 class="format-main-title">Vintage</h2>
+            <span class="format-badge" style="color: #fb7185; border-color: rgba(251,113,133,0.3); background: rgba(251,113,133,0.1);">Vintage</span>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="label">Deck Size</span>
+                <span class="value">60+ Cards (Sideboard: up to 15)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Copies Per Card</span>
+                <span class="value">Max 4 copies (Restricted: Max 1)</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Starting Life Total</span>
+                <span class="value">20 Life</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Legality Pool</span>
+                <span class="value">Eternal (No Bans, only Restrictions)</span>
+            </div>
+        </div>
+        <div>
+            <h3 class="rules-section-title">🔮 Core Format Mechanics</h3>
+            <ul class="rules-list">
+                <li><strong>The Highest Power Eternal Format</strong>: Vintage permits cards from all sets throughout MTG history. Unlike Legacy, cards are almost never banned for power level reasons.</li>
+                <li><strong>Restricted List</strong>: Instead of banning cards, Vintage features a "Restricted List". Highly powerful cards like Black Lotus, Ancestral Recall, Moxen, and Sol Ring are restricted to exactly <strong>one copy per deck</strong>.</li>
+                <li><strong>Fast-Paced Games</strong>: Games can sometimes be decided on the very first turn. Vintage allows players to experience the absolute peak of Magic's historical power level.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching logic
+    function switchFormat(formatName) {
+        // Toggle tab active button state
+        const tabBtns = document.querySelectorAll('.format-tab-btn');
+        tabBtns.forEach(btn => {
+            if (btn.innerText.includes(formatName)) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Toggle format content visibility
+        const contents = document.querySelectorAll('.format-content');
+        contents.forEach(content => {
+            if (content.id === `${formatName}-content`) {
+                content.classList.add('active');
+            } else {
+                content.classList.remove('active');
+            }
+        });
+    }
+
+    // Set active navigation tab
+    const navLinks = document.querySelectorAll('.nav-links-dropdown a');
+    navLinks.forEach(link => {
+        if (link.getAttribute('href') === '/rules') {
+            link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
+    });
+</script>
+{% endblock %}

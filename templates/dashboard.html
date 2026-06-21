@@ -1,0 +1,783 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - The Magicvault{% endblock %}
+
+{% block content %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+
+    .dashboard-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--panel-border);
+        border-radius: 14px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .dashboard-card .label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+    }
+
+    .dashboard-card .value {
+        font-size: 2rem;
+        font-weight: 700;
+        font-family: 'Cinzel', serif;
+    }
+    
+    .value.cards-count {
+        color: var(--accent-cyan);
+        text-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+    }
+
+    .value.value-total {
+        color: var(--accent-gold);
+        text-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+    }
+
+    .value.value-average {
+        color: var(--accent-purple);
+        text-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.2);
+    }
+
+    /* Period Changes Bar */
+    .changes-bar {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 30px;
+    }
+
+    @media (max-width: 768px) {
+        .changes-bar {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .change-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    .change-card .period-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+    }
+
+    .change-card .change-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin-top: 6px;
+    }
+
+    .change-value.positive {
+        color: var(--accent-green);
+        text-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+    }
+
+    .change-value.negative {
+        color: var(--accent-rose);
+        text-shadow: 0 0 10px rgba(244, 63, 94, 0.25);
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+
+    .charts-split-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+
+    @media (max-width: 992px) {
+        .charts-grid, .charts-split-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .chart-panel {
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 350px;
+        width: 100%;
+        margin-top: 15px;
+    }
+
+    .rarity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .rarity-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    /* Lists Grid */
+    .lists-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+
+    .items-list {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+    }
+
+    .list-item:hover {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .foil-badge-mini {
+        font-size: 0.65rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ec4899, #3b82f6, #eab308);
+        color: #0c0a1c;
+        padding: 1px 4px;
+        border-radius: 3px;
+        margin-left: 4px;
+        vertical-align: middle;
+    }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 2px solid rgba(var(--accent-purple-rgb), 0.2); padding-bottom: 12px; gap: 15px;">
+    <div>
+        <h1 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Magicvault Dashboard</h1>
+        {% if last_price_update %}
+            <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;">
+                Prices last updated: <strong style="color: var(--accent-cyan);" id="lastUpdateTimestamp" data-utc="{{ last_price_update.isoformat() }}Z">{{ last_price_update.strftime('%Y-%m-%d %H:%M:%S UTC') }}</strong>
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    const el = document.getElementById('lastUpdateTimestamp');
+                    if (el) {
+                        const utcStr = el.getAttribute('data-utc');
+                        if (utcStr) {
+                            const date = new Date(utcStr);
+                            el.textContent = date.toLocaleString();
+                        }
+                    }
+                });
+            </script>
+        {% else %}
+            <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;">
+                Prices last updated: <strong style="color: var(--text-muted);">Never</strong>
+            </div>
+        {% endif %}
+    </div>
+    <a href="/refresh_prices" class="btn btn-secondary" style="gap: 8px; padding: 10px 20px;">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="display: inline-block; vertical-align: middle;">
+            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+        </svg>
+        <span style="vertical-align: middle; font-weight: 600;">Refresh Prices</span>
+    </a>
+</div>
+
+<!-- Value Changes Row -->
+<div class="changes-bar">
+    <div class="change-card">
+        <span class="period-label">1-Day Change</span>
+        <span class="change-value {% if change_1d %}{% if change_1d > 0 %}positive{% elif change_1d < 0 %}negative{% endif %}{% endif %}">
+            {% if change_1d is not none %}
+                {{ "+" if change_1d > 0 }}{{ "%.2f"|format(change_1d) }}%
+            {% else %}
+                —
+            {% endif %}
+        </span>
+    </div>
+    <div class="change-card">
+        <span class="period-label">1-Month Change</span>
+        <span class="change-value {% if change_1m %}{% if change_1m > 0 %}positive{% elif change_1m < 0 %}negative{% endif %}{% endif %}">
+            {% if change_1m is not none %}
+                {{ "+" if change_1m > 0 }}{{ "%.2f"|format(change_1m) }}%
+            {% else %}
+                —
+            {% endif %}
+        </span>
+    </div>
+    <div class="change-card">
+        <span class="period-label">6-Month Change</span>
+        <span class="change-value {% if change_6m %}{% if change_6m > 0 %}positive{% elif change_6m < 0 %}negative{% endif %}{% endif %}">
+            {% if change_6m is not none %}
+                {{ "+" if change_6m > 0 }}{{ "%.2f"|format(change_6m) }}%
+            {% else %}
+                —
+            {% endif %}
+        </span>
+    </div>
+    <div class="change-card">
+        <span class="period-label">1-Year Change</span>
+        <span class="change-value {% if change_1y %}{% if change_1y > 0 %}positive{% elif change_1y < 0 %}negative{% endif %}{% endif %}">
+            {% if change_1y is not none %}
+                {{ "+" if change_1y > 0 }}{{ "%.2f"|format(change_1y) }}%
+            {% else %}
+                —
+            {% endif %}
+        </span>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="dashboard-card">
+        <span class="label">Total Cards</span>
+        <span class="value cards-count">{{ total_cards }}</span>
+    </div>
+    <div class="dashboard-card">
+        <span class="label">Estimated Value</span>
+        <span class="value value-total">${{ "%.2f"|format(total_value) }}</span>
+    </div>
+    <div class="dashboard-card">
+        <span class="label">Average Card Price</span>
+        <span class="value value-average">
+            {% if total_cards > 0 %}
+                ${{ "%.2f"|format(total_value / total_cards) }}
+            {% else %}
+                $0.00
+            {% endif %}
+        </span>
+    </div>
+    <div class="dashboard-card">
+        <span class="label">Foil Cards Ratio</span>
+        <span class="value" style="color: var(--accent-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.25);">
+            {{ foil_stats.foil }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">({{ "%.1f"|format(foil_stats.percentage) }}%)</span>
+        </span>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-panel">
+        <h3>Estimated Value Over Time</h3>
+        <div class="chart-container">
+            <canvas id="valueHistoryChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="chart-panel">
+        <h3>Rarity Breakdown</h3>
+        <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
+            <canvas id="rarityChart"></canvas>
+        </div>
+        <div class="rarity-list">
+            {% for r, q in rarity_stats %}
+                <div class="rarity-item">
+                    <span class="badge badge-{{ r|lower }}">{{ r|capitalize }}</span>
+                    <span style="font-weight: 600;">{{ q }} pcs</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- NEW: Secondary Charts Row (Color Balance & Set Breakdown) -->
+<div class="charts-split-grid">
+    <div class="chart-panel">
+        <h3>Color Balance</h3>
+        <div class="chart-container" style="height: 280px;">
+            <canvas id="colorChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-panel">
+        <h3>Set & Franchise Distribution (by Value)</h3>
+        <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
+            <canvas id="setChart"></canvas>
+        </div>
+        <div class="set-list" style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+            {% for s in set_stats %}
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="set-color-indicator-{{ loop.index0 }}" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="font-weight: 600; color: var(--text-main);">{{ s.set_name }}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="color: var(--text-muted); font-size: 0.8rem; margin-right: 8px;">{{ s.count }} pcs</span>
+                        <span style="font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(s.value) }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Set Completion & Missing Cards Section -->
+<div class="chart-panel" style="margin-bottom: 30px; width: 100%;">
+    <h3>Set Completion & Missing Cards Tracker</h3>
+    <div style="margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        {% for s in set_completion %}
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">{{ s.set_name }}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Set Code: <strong style="color: var(--accent-cyan);">{{ s.set_code }}</strong></div>
+                    </div>
+                    <span class="badge" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.25);">
+                        {{ "%.1f"|format(s.completion_rate) }}%
+                    </span>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin: 4px 0;">
+                    <div style="width: {{ s.completion_rate }}%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); border-radius: 4px;"></div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                    <div>Owned: <strong style="color: var(--text-main);">{{ s.owned_unique }}</strong> / {% if s.total_in_set > 0 %}{{ s.total_in_set }}{% else %}—{% endif %}</div>
+                    <div>Missing: <strong style="color: var(--accent-rose);">{% if s.total_in_set > 0 %}{{ s.missing }}{% else %}—{% endif %}</strong></div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+
+
+<!-- Leaderboards Row -->
+<div class="lists-grid">
+    <div class="chart-panel">
+        <h3>Top 5 Valuable Cards</h3>
+        <div class="items-list">
+            {% if top_valuable %}
+                {% for c in top_valuable %}
+                    <div class="list-item">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            {% if c.image_url %}
+                                <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                            {% else %}
+                                <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                            {% endif %}
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                    <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
+                                    {% if c.is_foil %}
+                                        <span class="foil-badge-mini">FOIL</span>
+                                    {% endif %}
+                                    {% if c.is_commander_candidate %}
+                                        <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
+                                    {% endif %}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ c.quantity }}x ${{ "%.2f"|format(c.price) }}</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(c.total_value) }}</div>
+                            <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 600;">{{ "%.1f"|format(c.share) }}% share</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No valuable cards found.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="chart-panel">
+        <h3>Top 5 Highest Quantity (Non-Land)</h3>
+        <div class="items-list">
+            {% if top_qty %}
+                {% for c in top_qty %}
+                    <div class="list-item">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            {% if c.image_url %}
+                                <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                            {% else %}
+                                <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                            {% endif %}
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                    <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
+                                    {% if c.is_foil %}
+                                        <span class="foil-badge-mini">FOIL</span>
+                                    {% endif %}
+                                    {% if c.is_commander_candidate %}
+                                        <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
+                                    {% endif %}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">${{ "%.2f"|format(c.price) }} each</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 700; color: var(--accent-purple);">{{ c.quantity }} pcs</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Valued: ${{ "%.2f"|format(c.total_value) }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No non-land cards found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="lists-grid">
+    <!-- NEW: Global Card Type Breakdown -->
+    <div class="chart-panel">
+        <h3>Card Type Breakdown</h3>
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
+            {% for t in type_stats %}
+                <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                        <span style="font-weight: 600; color: var(--text-main);">{{ t.type_name }}</span>
+                        <span style="color: var(--text-muted);">{{ t.count }} ({{ "%.1f"|format(t.count / total_cards * 100) }}%)</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                        <div style="width: {{ t.count / total_cards * 100 }}%; height: 100%; background: var(--accent-purple); border-radius: 3px;"></div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- NEW: Recent Additions Feed -->
+    <div class="chart-panel">
+        <h3>Recent Inventory Additions</h3>
+        <div class="items-list">
+            {% if recent_additions %}
+                {% for item in recent_additions %}
+                    <div class="list-item">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            {% if item.image_url %}
+                                <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                            {% else %}
+                                <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                            {% endif %}
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                    <a href="{{ item.url }}" style="color: var(--text-main); text-decoration: none;">{{ item.name }}</a>
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ item.details }}</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span class="badge" style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6, 182, 212, 0.12); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.25);">{{ item.type }}</span>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">{{ item.set_code }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No recent additions.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // --- History Line Chart ---
+    const historyRaw = {{ history_data|tojson }};
+    historyRaw.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    const historyLabels = historyRaw.map(d => {
+        const date = new Date(d.timestamp);
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    });
+    const historyValues = historyRaw.map(d => d.value);
+    const activeColorRGB = getComputedStyle(document.body).getPropertyValue('--accent-purple-rgb').trim() || '168, 85, 247';
+    const activeColorHex = getComputedStyle(document.body).getPropertyValue('--accent-purple').trim() || '#a855f7';
+
+    const historyCtx = document.getElementById('valueHistoryChart').getContext('2d');
+    const lineGradient = historyCtx.createLinearGradient(0, 0, 0, 350);
+    lineGradient.addColorStop(0, `rgba(${activeColorRGB}, 0.4)`);
+    lineGradient.addColorStop(1, `rgba(${activeColorRGB}, 0.0)`);
+ 
+    new Chart(historyCtx, {
+        type: 'line',
+        data: {
+            labels: historyLabels,
+            datasets: [{
+                label: 'Portfolio Value (USD)',
+                data: historyValues,
+                borderColor: activeColorHex,
+                borderWidth: 3,
+                pointBackgroundColor: '#06b6d4',
+                pointBorderColor: '#ffffff',
+                pointHoverRadius: 7,
+                pointHoverBackgroundColor: '#06b6d4',
+                pointHoverBorderColor: '#ffffff',
+                pointRadius: historyValues.length > 20 ? 1 : 4,
+                fill: true,
+                backgroundColor: lineGradient,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(11, 9, 20, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#f8fafc',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(ctx) {
+                            return 'Value: $' + ctx.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)', borderColor: 'rgba(255, 255, 255, 0.08)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 10 }, autoSkip: true, maxTicksLimit: 8 }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)', borderColor: 'rgba(255, 255, 255, 0.08)' },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { family: 'Plus Jakarta Sans', size: 10 },
+                        callback: function(val) { return '$' + val.toFixed(2); }
+                    }
+                }
+            }
+        }
+    });
+ 
+    // --- Rarity Doughnut Chart ---
+    const rarityLabels = [];
+    const rarityData = [];
+    const rarityColors = [];
+    
+    const rarityColorsMap = {
+        'common': '#94a3b8',
+        'uncommon': '#38bdf8',
+        'rare': '#fbbf24',
+        'mythic': '#f43f5e'
+    };
+    
+    {% for r, q in rarity_stats %}
+        rarityLabels.push('{{ r|capitalize }}');
+        rarityData.push({{ q }});
+        rarityColors.push(rarityColorsMap['{{ r|lower }}'] || '#a855f7');
+    {% endfor %}
+ 
+    const rarityCtx = document.getElementById('rarityChart').getContext('2d');
+    new Chart(rarityCtx, {
+        type: 'doughnut',
+        data: {
+            labels: rarityLabels,
+            datasets: [{
+                data: rarityData,
+                backgroundColor: rarityColors,
+                borderWidth: 2,
+                borderColor: '#141024',
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(11, 9, 20, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#f8fafc',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    padding: 10
+                }
+            },
+            cutout: '70%'
+        }
+    });
+
+    // --- NEW: Color Balance Bar Chart ---
+    const colorLabels = [];
+    const colorData = [];
+    const colorColors = [];
+
+    const mtgColorsMap = {
+        'W': '#fef08a',         // Soft Yellow/White
+        'U': '#3b82f6',         // Blue
+        'B': '#475569',         // Black/Slate
+        'R': '#ef4444',         // Red
+        'G': '#22c55e',         // Green
+        'Multicolor': '#c084fc',// Purple
+        'Colorless': '#94a3b8'  // Grey
+    };
+
+    const colorFullNameMap = {
+        'W': 'White',
+        'U': 'Blue',
+        'B': 'Black',
+        'R': 'Red',
+        'G': 'Green',
+        'Multicolor': 'Multicolor',
+        'Colorless': 'Colorless'
+    };
+
+    {% for c in color_stats %}
+        colorLabels.push(colorFullNameMap['{{ c.color }}'] || '{{ c.color }}');
+        colorData.push({{ c.count }});
+        colorColors.push(mtgColorsMap['{{ c.color }}'] || '#a855f7');
+    {% endfor %}
+
+    const colorCtx = document.getElementById('colorChart').getContext('2d');
+    new Chart(colorCtx, {
+        type: 'bar',
+        data: {
+            labels: colorLabels,
+            datasets: [{
+                data: colorData,
+                backgroundColor: colorColors,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(11, 9, 20, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#f8fafc',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 10 } }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 10 }, precision: 0 }
+                }
+            }
+        }
+    });
+
+    // --- NEW: Set Breakdown Doughnut Chart (by Value) ---
+    const setStats = {{ set_stats|tojson }};
+    const setLabels = setStats.map(s => s.set_name);
+    const setData = setStats.map(s => s.value);
+    const setColors = [
+        '#4ade80', // TMNT Green
+        '#60a5fa', // FF Blue
+        '#fb7185', // Aetherdrift Rose
+        '#fbbf24', // Foundations Gold
+        '#f59e0b', // Foundations Commander Amber
+        '#fb923c', // Fallout Orange
+        '#c084fc', // Tarkir Purple
+        '#94a3b8'  // Other Grey
+    ];
+
+    const setCtx = document.getElementById('setChart').getContext('2d');
+    new Chart(setCtx, {
+        type: 'doughnut',
+        data: {
+            labels: setLabels,
+            datasets: [{
+                data: setData,
+                backgroundColor: setColors.slice(0, setData.length),
+                borderWidth: 2,
+                borderColor: '#141024'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false // Using our custom HTML list with color indicators below!
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(11, 9, 20, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#f8fafc',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(ctx) {
+                            const setIndex = ctx.dataIndex;
+                            const setObj = setStats[setIndex];
+                            return ` ${setObj.set_name}: $${setObj.value.toFixed(2)} (${setObj.count} pcs)`;
+                        }
+                    }
+                }
+            },
+            cutout: '60%'
+        }
+    });
+
+    // Populate set color indicators dynamically
+    setStats.forEach((s, idx) => {
+        const indicator = document.querySelector('.set-color-indicator-' + idx);
+        if (indicator) {
+            indicator.style.backgroundColor = setColors[idx % setColors.length];
+        }
+    });
+    
+
+
+    // Simple active tab selector
+    const currentPath = window.location.pathname;
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
+    });
+</script>
+{% endblock %}

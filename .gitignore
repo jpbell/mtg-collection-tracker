@@ -1,0 +1,26 @@
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Database (protect personal collection logs and data)
+*.db
+*.sqlite3
+
+# Local Passcode & Sensitive Configurations
+passcode.txt
+
+# Local Caches & Generated Metadata
+*cache.json
+price_update_metadata.json
+
+# IDE settings
+.vscode/
+.idea/
+.DS_Store

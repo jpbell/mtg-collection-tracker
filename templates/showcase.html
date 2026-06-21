@@ -1,0 +1,1018 @@
+{% extends "base.html" %}
+
+{% block title %}Top 5 Cards Showcase - The Magicvault{% endblock %}
+
+{% block extra_head %}
+    <!-- OpenGraph Rich Embed Previews -->
+    <meta property="og:title" content="My Magicvault Elite Showcase">
+    <meta property="og:description" content="Check out the top 5 most valuable MTG cards in my collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of my library)">
+    <meta property="og:type" content="website">
+    {% if cards and cards[0].image_url %}
+        <meta property="og:image" content="{{ cards[0].image_url }}">
+    {% endif %}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="My Magicvault Elite Showcase">
+    <meta name="twitter:description" content="Check out my top 5 most valuable MTG cards, valued at ${{ '%.2f'|format(total_value) }}!">
+{% endblock %}
+
+{% block content %}
+<style>
+    .showcase-header {
+        text-align: center;
+        margin-bottom: 30px;
+        animation: fadeInUp 0.5s ease;
+    }
+
+    .showcase-title {
+        font-family: 'Cinzel', serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: 2px;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: var(--shadow-glow);
+    }
+
+    .showcase-subtitle {
+        color: var(--text-muted);
+        font-size: 1.05rem;
+        max-width: 600px;
+        margin: 0 auto 20px auto;
+        line-height: 1.6;
+    }
+
+    /* Milestone XP Progress Bar */
+    .showcase-milestone-container {
+        max-width: 600px;
+        margin: 0 auto 35px auto;
+        text-align: left;
+        background: rgba(20, 16, 36, 0.4);
+        border: 1px solid var(--panel-border);
+        padding: 18px 24px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(8px);
+        animation: fadeInUp 0.5s ease;
+        animation-delay: 50ms;
+        animation-fill-mode: both;
+    }
+
+    .milestone-progress-bar-bg {
+        width: 100%;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 9999px;
+        overflow: hidden;
+        position: relative;
+        margin: 10px 0;
+        border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .milestone-progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+        border-radius: 9999px;
+        box-shadow: 0 0 12px rgba(6, 182, 212, 0.6);
+        transition: width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Showcase Stats */
+    .showcase-stats {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        margin-bottom: 40px;
+        flex-wrap: wrap;
+        animation: fadeInUp 0.5s ease;
+        animation-delay: 100ms;
+        animation-fill-mode: both;
+    }
+
+    .showcase-stat-card {
+        background: rgba(20, 16, 36, 0.4);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 16px 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 180px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(8px);
+    }
+
+    .showcase-stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+    }
+
+    .showcase-stat-value {
+        font-family: 'Cinzel', serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--accent-cyan);
+        text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+    }
+
+    .showcase-stat-value.gold {
+        color: var(--accent-gold);
+        text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Card Grid & Wrapper */
+    .showcase-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 28px;
+        margin-top: 20px;
+    }
+
+    .showcase-card-wrapper {
+        opacity: 0;
+        animation: fadeInUp 0.5s ease forwards;
+        will-change: opacity, transform;
+    }
+
+    .showcase-card {
+        background: rgba(20, 16, 36, 0.4);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        transition: border-color 0.3s ease, 
+                    box-shadow 0.3s ease,
+                    transform 0.5s ease;
+        transform-style: preserve-3d;
+        will-change: transform, box-shadow;
+        height: 100%;
+    }
+
+    /* Card themes for border and hover glows matching color identities */
+    .showcase-card.theme-white {
+        --theme-glow: rgba(248, 250, 252, 0.25);
+        --theme-accent: #f8fafc;
+        border-color: rgba(248, 250, 252, 0.15);
+    }
+    .showcase-card.theme-blue {
+        --theme-glow: rgba(6, 182, 212, 0.35);
+        --theme-accent: var(--accent-cyan);
+        border-color: rgba(6, 182, 212, 0.2);
+    }
+    .showcase-card.theme-black {
+        --theme-glow: rgba(168, 85, 247, 0.35);
+        --theme-accent: var(--accent-purple);
+        border-color: rgba(168, 85, 247, 0.15);
+    }
+    .showcase-card.theme-red {
+        --theme-glow: rgba(244, 63, 94, 0.35);
+        --theme-accent: var(--accent-rose);
+        border-color: rgba(244, 63, 94, 0.15);
+    }
+    .showcase-card.theme-green {
+        --theme-glow: rgba(16, 185, 129, 0.35);
+        --theme-accent: var(--accent-green);
+        border-color: rgba(16, 185, 129, 0.2);
+    }
+    .showcase-card.theme-multicolor {
+        --theme-glow: rgba(245, 158, 11, 0.35);
+        --theme-accent: var(--accent-gold);
+        border-color: rgba(245, 158, 11, 0.2);
+    }
+    .showcase-card.theme-colorless {
+        --theme-glow: rgba(148, 163, 184, 0.2);
+        --theme-accent: var(--text-muted);
+        border-color: rgba(148, 163, 184, 0.15);
+    }
+
+    .showcase-card:hover {
+        border-color: var(--theme-accent);
+        box-shadow: 0 15px 35px var(--theme-glow), 0 0 15px rgba(255,255,255,0.02);
+    }
+
+    .rank-badge {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        z-index: 10;
+        background: rgba(11, 9, 20, 0.85);
+        border: 1px solid var(--accent-gold);
+        color: var(--accent-gold);
+        font-family: 'Cinzel', serif;
+        font-weight: 800;
+        font-size: 1rem;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+    }
+
+    .rank-badge.silver {
+        border-color: #cbd5e1;
+        color: #cbd5e1;
+        box-shadow: 0 0 10px rgba(203, 213, 225, 0.4);
+    }
+
+    .rank-badge.bronze {
+        border-color: #b45309;
+        color: #f59e0b;
+        box-shadow: 0 0 10px rgba(217, 119, 6, 0.3);
+    }
+
+    .rank-badge.normal {
+        border-color: var(--panel-border);
+        color: var(--text-muted);
+        box-shadow: none;
+    }
+
+    .showcase-image-wrapper {
+        position: relative;
+        width: 100%;
+        padding-top: 139.5%; /* MTG Aspect Ratio */
+        background: rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+    }
+
+    /* Holofoil sheen overlay */
+    .foil-sheen-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            125deg,
+            rgba(255, 0, 128, 0) 0%,
+            rgba(255, 0, 128, 0.1) 20%,
+            rgba(0, 255, 255, 0.15) 40%,
+            rgba(255, 255, 0, 0.1) 60%,
+            rgba(0, 255, 0, 0.05) 80%,
+            rgba(255, 0, 128, 0) 100%
+        );
+        background-size: 200% 200%;
+        background-position: 50% 50%;
+        mix-blend-mode: color-dodge;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 5;
+    }
+    
+    .showcase-card.is-foil:hover .foil-sheen-overlay {
+        opacity: 0.85;
+    }
+
+    .showcase-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+    }
+
+    .showcase-card:hover .showcase-image {
+        transform: scale(1.05);
+    }
+
+    .showcase-card-placeholder {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        text-align: center;
+        font-family: 'Cinzel', serif;
+        background: linear-gradient(135deg, rgba(30, 20, 50, 0.6), rgba(10, 10, 25, 0.8));
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .showcase-info {
+        padding: 20px;
+        display: flex;
+        flex-grow: 1;
+        flex-direction: column;
+        background: rgba(11, 9, 20, 0.45);
+        backdrop-filter: blur(4px);
+    }
+
+    .showcase-card-title {
+        font-size: 1rem;
+        margin: 0 0 8px 0;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-main);
+    }
+
+    .showcase-card-meta {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .showcase-badges {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+    }
+
+    .showcase-price-row {
+        margin-top: auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        padding-top: 12px;
+    }
+
+    .showcase-price-label {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .showcase-price-value {
+        font-family: 'Cinzel', serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--accent-gold);
+        text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(5, 4, 10, 0.85);
+        backdrop-filter: blur(12px);
+        z-index: 2000;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .modal-content {
+        background: linear-gradient(135deg, rgba(20, 16, 36, 0.96) 0%, rgba(10, 8, 20, 0.98) 100%);
+        border: 1px solid var(--panel-border);
+        border-radius: 24px;
+        max-width: 760px;
+        width: 100%;
+        position: relative;
+        padding: 32px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 35px rgba(var(--accent-purple-rgb), 0.25);
+        animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        margin: 40px auto;
+        box-sizing: border-box;
+    }
+
+    .modal-close-btn {
+        position: absolute;
+        top: 12px;
+        right: 16px;
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 1.8rem;
+        cursor: pointer;
+        transition: color 0.2s;
+        z-index: 10;
+    }
+
+    .modal-close-btn:hover {
+        color: var(--accent-rose) !important;
+    }
+
+    .modal-body-layout {
+        display: flex;
+        gap: 32px;
+        align-items: flex-start;
+    }
+
+    .modal-image-col {
+        flex: 0 0 260px;
+    }
+
+    .modal-image-container {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+        aspect-ratio: 1 / 1.395;
+        background: rgba(0, 0, 0, 0.4);
+    }
+
+    #modalCardImage {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .modal-info-col {
+        flex: 1;
+        min-width: 0; /* Prevents overflow */
+    }
+
+    .modal-title {
+        font-size: 1.8rem;
+        margin-top: 0;
+        margin-bottom: 16px;
+        background: linear-gradient(135deg, var(--text-main) 0%, var(--text-muted) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1.2;
+    }
+
+    .modal-quick-stats {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .modal-quick-stat {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 10px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 110px;
+    }
+
+    .modal-quick-stat .stat-lbl {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    .modal-quick-stat .stat-val {
+        font-family: 'Cinzel', serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+
+    .modal-quick-stat .stat-val.gold {
+        color: var(--accent-gold);
+        text-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+    }
+
+    .modal-details-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 20px;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .detail-label {
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .detail-value {
+        color: var(--text-main);
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .text-success {
+        color: var(--accent-green) !important;
+    }
+
+    .text-danger {
+        color: var(--accent-rose) !important;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes scaleUp {
+        from { transform: scale(0.92) translateY(15px); opacity: 0; }
+        to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(24px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .modal-body-layout {
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .modal-image-col {
+            flex: 0 0 220px;
+            width: 220px;
+        }
+        .modal-content {
+            padding: 24px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+    }
+</style>
+
+<div class="showcase-header">
+    <h1 class="showcase-title">⚜️ The Elite Showcase ⚜️</h1>
+    <p class="showcase-subtitle">
+        A real-time public showcase of the top 5 most valuable Magic: The Gathering cards in my personal collection. 
+        As new cards are summoned, this collection dynamically updates to reflect the highest tier items.
+    </p>
+    <div style="display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 16px;">
+        <button id="copyShowcaseLinkBtn" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; height: 36px; border: 1px solid var(--panel-border); background: rgba(255,255,255,0.02);" title="Copy showcase page link">
+            <span>🔗 Copy Share Link</span>
+        </button>
+    </div>
+</div>
+
+{% if cards %}
+    <!-- Milestone progress bar calculator -->
+    {% set val = total_value or 0.0 %}
+    {% if val < 100 %}
+        {% set milestone = 100 %}
+    {% elif val < 500 %}
+        {% set milestone = 500 %}
+    {% elif val < 1000 %}
+        {% set milestone = 1000 %}
+    {% elif val < 5000 %}
+        {% set milestone = 5000 %}
+    {% else %}
+        {% set milestone = 10000 %}
+    {% endif %}
+    {% set pct = (val / milestone * 100)|round(1) %}
+    {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+
+    <!-- Milestone XP Bar -->
+    <div class="showcase-milestone-container">
+        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
+            <span style="color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">🏆 Showcase Value Tier</span>
+            <span style="color: var(--accent-gold); font-weight: 700;">${{ "%.2f"|format(val) }} / ${{ milestone }}</span>
+        </div>
+        <div class="milestone-progress-bar-bg">
+            <div class="milestone-progress-bar-fill" style="width: {{ pct }}%;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); font-weight: 500;">
+            <span>Current Tier</span>
+            <span>{{ pct }}% to Next Milestone</span>
+        </div>
+    </div>
+
+    <!-- Showcase Stats cards -->
+    <div class="showcase-stats">
+        <div class="showcase-stat-card">
+            <span class="showcase-stat-label">Showcase Value</span>
+            <span class="showcase-stat-value gold">${{ "%.2f"|format(total_value) }}</span>
+        </div>
+        <div class="showcase-stat-card">
+            <span class="showcase-stat-label">Total Qty</span>
+            <span class="showcase-stat-value">{{ total_qty }} Cards</span>
+        </div>
+        <div class="showcase-stat-card" title="Percentage of total library value held by these 5 cards">
+            <span class="showcase-stat-label">Concentration</span>
+            <span class="showcase-stat-value" style="color: var(--accent-purple); text-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.3);">{{ "%.1f"|format(concentration) }}%</span>
+        </div>
+    </div>
+
+    <div class="showcase-grid">
+        {% for card in cards %}
+            {# Determine card color identity class #}
+            {% set color_list = card.colors.split(',') if card.colors else [] %}
+            {% set color_count = color_list|length %}
+            {% if color_count == 0 %}
+                {% set theme_class = 'theme-colorless' %}
+            {% elif color_count > 1 %}
+                {% set theme_class = 'theme-multicolor' %}
+            {% else %}
+                {% if color_list[0]|lower == 'w' %}{% set theme_class = 'theme-white' %}
+                {% elif color_list[0]|lower == 'u' %}{% set theme_class = 'theme-blue' %}
+                {% elif color_list[0]|lower == 'b' %}{% set theme_class = 'theme-black' %}
+                {% elif color_list[0]|lower == 'r' %}{% set theme_class = 'theme-red' %}
+                {% elif color_list[0]|lower == 'g' %}{% set theme_class = 'theme-green' %}
+                {% else %}{% set theme_class = 'theme-colorless' %}{% endif %}
+            {% endif %}
+
+            <div class="showcase-card-wrapper" style="animation-delay: {{ loop.index0 * 100 }}ms;">
+                <div class="showcase-card {{ theme_class }} {% if card.is_foil %}is-foil{% endif %}" 
+                     style="cursor: pointer;"
+                     data-name="{{ card.name }}"
+                     data-set="{{ card.set_code|upper }}"
+                     data-number="{{ card.collector_number or '' }}"
+                     data-rarity="{{ card.rarity or 'Unknown' }}"
+                     data-price="{{ '%.2f'|format(card.price or 0.0) }}"
+                     data-is-foil="{{ card.is_foil|int }}"
+                     data-mana-cost="{{ card.mana_cost or '' }}"
+                     data-cmc="{{ card.cmc or 0 }}"
+                     data-type-line="{{ card.type_line or '' }}"
+                     data-colors="{{ card.colors or '' }}"
+                     data-is-illegal="{{ card.is_illegal|int }}"
+                     data-image="{{ card.image_url or '' }}"
+                     data-is-commander="{{ card.is_commander_candidate|int }}">
+                    
+                    <!-- Rank Badge -->
+                    <div class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}normal{% endif %}" title="Rank #{{ loop.index }}">
+                        {{ loop.index }}
+                    </div>
+                    
+                    <div class="showcase-image-wrapper">
+                        {% if card.is_foil %}
+                            <div class="foil-sheen-overlay"></div>
+                        {% endif %}
+                        {% if card.image_url %}
+                            <img src="{{ card.image_url }}" alt="{{ card.name }}" class="showcase-image" loading="lazy">
+                        {% else %}
+                            <div class="showcase-card-placeholder">
+                                <div>{{ card.name }}</div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="showcase-info">
+                        <h3 class="showcase-card-title" title="{{ card.name }}">{{ card.name }}</h3>
+                        
+                        <div class="showcase-card-meta">
+                            <span>{{ card.set_code|upper }} #{{ card.collector_number or '?' }}</span>
+                            <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600;">Qty: {{ card.quantity }}</span>
+                        </div>
+
+                        <div class="showcase-badges">
+                            {% if card.rarity %}
+                                <span class="badge badge-{{ card.rarity|lower }}">{{ card.rarity }}</span>
+                            {% endif %}
+                            {% if card.is_foil %}
+                                <span class="badge foil-badge" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(168, 85, 247, 0.15)); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">Foil</span>
+                            {% endif %}
+                            {% if card.is_commander_candidate %}
+                                <span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25);">👑 Commander</span>
+                            {% endif %}
+                            {% if card.is_illegal %}
+                                <span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.25);" title="This card is banned or illegal in formats like Standard or Commander">🚨 Banned / Illegal</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="showcase-price-row">
+                            <span class="showcase-price-label">Value</span>
+                            <span class="showcase-price-value">${{ "%.2f"|format(card.price or 0.0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div style="text-align: center; padding: 60px 20px; border: 1px dashed var(--panel-border); border-radius: 16px; background: rgba(255,255,255,0.01);">
+        <div style="font-size: 3rem; margin-bottom: 16px;">🔮</div>
+        <h3 style="font-family: 'Cinzel', serif; margin-bottom: 8px; color: var(--text-main);">Vault is Currently Empty</h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 400px; margin: 0 auto;">
+            No cards are currently available in the vault library. Go back to the main page to summon some legendary cards!
+        </p>
+    </div>
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Clipboard Helper ---
+        const copyBtn = document.getElementById('copyShowcaseLinkBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function() {
+                const url = window.location.href;
+                navigator.clipboard.writeText(url).then(() => {
+                    const origText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<span>✅ Link Copied!</span>';
+                    copyBtn.style.borderColor = 'var(--accent-green)';
+                    copyBtn.style.color = 'var(--accent-green)';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = origText;
+                        copyBtn.style.borderColor = '';
+                        copyBtn.style.color = '';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy link: ', err);
+                });
+            });
+        }
+
+        // --- 3D Hover & Foil Parallax Effect ---
+        const cards = document.querySelectorAll('.showcase-card');
+        
+        cards.forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const xc = rect.width / 2;
+                const yc = rect.height / 2;
+                // Tilt degree capped at ~8 deg for subtle premium feel
+                const angleX = (yc - y) / 12;
+                const angleY = (x - xc) / 12;
+                
+                // Dynamically set snappy transition during active pointer tracking
+                card.style.transition = 'transform 0.08s ease-out, border-color 0.3s ease, box-shadow 0.3s ease';
+                card.style.transform = `perspective(800px) rotateX(${angleX}deg) rotateY(${angleY}deg) translateY(-8px) scale(1.03)`;
+                
+                // Shift background position of sheen if card is foil
+                const sheen = card.querySelector('.foil-sheen-overlay');
+                if (sheen) {
+                    const pctX = (x / rect.width) * 100;
+                    const pctY = (y / rect.height) * 100;
+                    sheen.style.backgroundPosition = `${pctX}% ${pctY}%`;
+                }
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                // Restore slow smooth transition to return to base state
+                card.style.transition = 'transform 0.5s ease, border-color 0.3s ease, box-shadow 0.3s ease';
+                card.style.transform = '';
+                const sheen = card.querySelector('.foil-sheen-overlay');
+                if (sheen) {
+                    sheen.style.backgroundPosition = '';
+                }
+            });
+        });
+
+        // --- Modal Inspector ---
+        const modal = document.getElementById('inspectorModal');
+        const closeBtn = document.querySelector('.modal-close-btn');
+
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                // Read datasets
+                const name = card.dataset.name;
+                const set = card.dataset.set;
+                const number = card.dataset.number;
+                const rarity = card.dataset.rarity;
+                const price = card.dataset.price;
+                const isFoil = parseInt(card.dataset.isFoil);
+                const manaCost = card.dataset.manaCost;
+                const cmc = card.dataset.cmc;
+                const typeLine = card.dataset.typeLine;
+                const isIllegal = parseInt(card.dataset.isIllegal);
+                const image = card.dataset.image;
+
+                // Populate modal
+                document.getElementById('modalCardImage').src = image || '/static/placeholder.jpg';
+                document.getElementById('modalCardName').textContent = name;
+                document.getElementById('modalCardPrice').textContent = '$' + price;
+                document.getElementById('modalCardCMC').textContent = cmc;
+                document.getElementById('modalCardMana').textContent = manaCost || 'N/A';
+                document.getElementById('modalCardType').textContent = typeLine || 'N/A';
+                document.getElementById('modalCardSet').textContent = set + (number ? ' #' + number : '');
+                document.getElementById('modalCardRarity').textContent = rarity;
+                
+                const modalFoilText = document.getElementById('modalCardFoil');
+                const modalFoilSheen = document.getElementById('modalFoilSheen');
+                if (isFoil) {
+                    modalFoilText.textContent = 'Foil ✨';
+                    modalFoilText.style.color = '#c084fc';
+                    if (modalFoilSheen) modalFoilSheen.style.display = 'block';
+                } else {
+                    modalFoilText.textContent = 'Non-Foil';
+                    modalFoilText.style.color = '';
+                    if (modalFoilSheen) modalFoilSheen.style.display = 'none';
+                }
+
+                // Reset and populate live format legalities grid from Scryfall
+                const legalitiesGrid = document.getElementById('modalLegalitiesGrid');
+                legalitiesGrid.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem; grid-column: span 2; padding: 6px 0;">Loading format data...</span>';
+
+                if (set && number) {
+                    fetch(`https://api.scryfall.com/cards/${set.toLowerCase()}/${number}`)
+                        .then(res => {
+                            if (!res.ok) throw new Error('API request failed');
+                            return res.json();
+                        })
+                        .then(data => {
+                            const legalities = data.legalities;
+                            if (legalities) {
+                                legalitiesGrid.innerHTML = '';
+                                
+                                const formatsToShow = [
+                                    { key: 'standard', name: 'Standard' },
+                                    { key: 'pioneer', name: 'Pioneer' },
+                                    { key: 'modern', name: 'Modern' },
+                                    { key: 'legacy', name: 'Legacy' },
+                                    { key: 'vintage', name: 'Vintage' },
+                                    { key: 'commander', name: 'Commander' },
+                                    { key: 'pauper', name: 'Pauper' },
+                                    { key: 'explorer', name: 'Explorer' }
+                                ];
+                                
+                                formatsToShow.forEach(f => {
+                                    const status = legalities[f.key] || 'not_legal';
+                                    let statusText = 'Not Legal';
+                                    let statusColor = 'var(--text-muted)';
+                                    let statusBg = 'rgba(255, 255, 255, 0.03)';
+                                    let statusBorder = 'rgba(255, 255, 255, 0.05)';
+                                    
+                                    if (status === 'legal') {
+                                        statusText = 'Legal';
+                                        statusColor = 'var(--accent-green)';
+                                        statusBg = 'rgba(16, 185, 129, 0.12)';
+                                        statusBorder = 'rgba(16, 185, 129, 0.25)';
+                                    } else if (status === 'banned') {
+                                        statusText = 'Banned';
+                                        statusColor = 'var(--accent-rose)';
+                                        statusBg = 'rgba(244, 63, 94, 0.12)';
+                                        statusBorder = 'rgba(244, 63, 94, 0.25)';
+                                    } else if (status === 'restricted') {
+                                        statusText = 'Restricted';
+                                        statusColor = 'var(--accent-gold)';
+                                        statusBg = 'rgba(245, 158, 11, 0.12)';
+                                        statusBorder = 'rgba(245, 158, 11, 0.25)';
+                                    }
+                                    
+                                    const itemEl = document.createElement('div');
+                                    itemEl.style.display = 'flex';
+                                    itemEl.style.justify = 'space-between';
+                                    itemEl.style.alignItems = 'center';
+                                    itemEl.style.background = 'rgba(255, 255, 255, 0.01)';
+                                    itemEl.style.border = '1px solid var(--panel-border)';
+                                    itemEl.style.borderRadius = '8px';
+                                    itemEl.style.padding = '6px 12px';
+                                    itemEl.style.fontSize = '0.8rem';
+                                    
+                                    itemEl.innerHTML = `
+                                        <span style="color: var(--text-muted); font-weight: 500;">${f.name}</span>
+                                        <span class="badge" style="background: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder}; padding: 2px 6px; font-size: 0.7rem; font-weight: 700; border-radius: 9999px; text-transform: uppercase;">${statusText}</span>
+                                    `;
+                                    legalitiesGrid.appendChild(itemEl);
+                                });
+                            } else {
+                                throw new Error('No legalities payload');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Failed to query Scryfall legality:', err);
+                            legalitiesGrid.innerHTML = '';
+                            
+                            const fallbackEl = document.createElement('div');
+                            fallbackEl.style.gridColumn = 'span 2';
+                            fallbackEl.style.padding = '10px';
+                            fallbackEl.style.borderRadius = '8px';
+                            fallbackEl.style.border = '1px solid var(--panel-border)';
+                            fallbackEl.style.fontSize = '0.85rem';
+                            fallbackEl.style.textAlign = 'center';
+                            
+                            if (isIllegal) {
+                                fallbackEl.style.background = 'rgba(244, 63, 94, 0.08)';
+                                fallbackEl.style.borderColor = 'rgba(244, 63, 94, 0.2)';
+                                fallbackEl.style.color = 'var(--accent-rose)';
+                                fallbackEl.innerHTML = '🚨 Banned / Illegal in major formats';
+                            } else {
+                                fallbackEl.style.background = 'rgba(16, 185, 129, 0.08)';
+                                fallbackEl.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+                                fallbackEl.style.color = 'var(--accent-green)';
+                                fallbackEl.innerHTML = '✅ Legal in standard formats';
+                            }
+                            legalitiesGrid.appendChild(fallbackEl);
+                        });
+                } else {
+                    legalitiesGrid.innerHTML = '<span style="color: var(--accent-rose); font-size: 0.8rem; grid-column: span 2; padding: 6px 0;">Cannot fetch legalities (no print information)</span>';
+                }
+
+                // Scryfall link
+                const scryfallLink = document.getElementById('modalScryfallLink');
+                if (set && number) {
+                    scryfallLink.href = `https://scryfall.com/card/${set.toLowerCase()}/${number}`;
+                } else {
+                    scryfallLink.href = `https://scryfall.com/search?q=${encodeURIComponent(name)}`;
+                }
+
+                // Show modal with animations
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            });
+        });
+
+        const closeModal = () => {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                closeModal();
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block modal %}
+<!-- Detail / Inspector Modal -->
+<div id="inspectorModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <button class="modal-close-btn" aria-label="Close modal">&times;</button>
+        <div class="modal-body-layout">
+            <div class="modal-image-col">
+                <div class="modal-image-container">
+                    <div id="modalFoilSheen" class="foil-sheen-overlay"></div>
+                    <img id="modalCardImage" src="" alt="Card Image">
+                </div>
+            </div>
+            <div class="modal-info-col">
+                <h2 id="modalCardName" class="modal-title"></h2>
+                
+                <div class="modal-quick-stats">
+                    <div class="modal-quick-stat">
+                        <span class="stat-lbl">Price</span>
+                        <span id="modalCardPrice" class="stat-val gold"></span>
+                    </div>
+                    <div class="modal-quick-stat">
+                        <span class="stat-lbl">CMC</span>
+                        <span id="modalCardCMC" class="stat-val"></span>
+                    </div>
+                </div>
+                
+                <div class="modal-details-grid">
+                    <div class="detail-row">
+                        <span class="detail-label">Mana Cost</span>
+                        <span id="modalCardMana" class="detail-value"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Type Line</span>
+                        <span id="modalCardType" class="detail-value"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Set / Collector No.</span>
+                        <span id="modalCardSet" class="detail-value"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rarity</span>
+                        <span id="modalCardRarity" class="detail-value" style="text-transform: capitalize;"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Printing</span>
+                        <span id="modalCardFoil" class="detail-value"></span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <span class="detail-label" style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--text-muted); font-weight: 600;">Format Legalities</span>
+                    <div id="modalLegalitiesGrid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                        <!-- Dynamically filled: format name + status pill -->
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 24px;">
+                    <a id="modalScryfallLink" href="" target="_blank" rel="noopener noreferrer" class="btn" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; width: 100%; justify-content: center; padding: 12px; font-weight: 600; border-radius: 12px; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.25)'; this.style.borderColor='var(--accent-purple)';" onmouseout="this.style.background='rgba(168, 85, 247, 0.15)'; this.style.borderColor='rgba(168, 85, 247, 0.3)';">
+                        🔍 View on Scryfall
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

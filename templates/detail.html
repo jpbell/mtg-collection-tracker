@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ card.name }} - The Magicvault{% endblock %}
+
+{% block content %}
+<style>
+    .detail-card {
+        display: flex;
+        gap: 40px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    
+    .detail-image-wrapper {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        max-width: 320px;
+        width: 100%;
+        border: 1px solid var(--panel-border);
+    }
+    
+    .detail-image-wrapper img {
+        width: 100%;
+        display: block;
+    }
+    
+    .detail-image-wrapper.is-foil::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(59, 130, 246, 0.08) 50%, rgba(234, 179, 8, 0.08) 100%);
+        pointer-events: none;
+        mix-blend-mode: color-dodge;
+        opacity: 0.95;
+        z-index: 2;
+    }
+    
+    .detail-info {
+        flex: 1;
+        min-width: 300px;
+    }
+    
+    .foil-badge {
+        background: linear-gradient(135deg, #ec4899, #3b82f6, #eab308);
+        color: #0c0a1c !important;
+        font-weight: 800;
+        border: none !important;
+        text-shadow: none !important;
+    }
+</style>
+
+<div class="detail-card">
+    <div class="detail-image-wrapper{% if card.is_foil %} is-foil{% endif %}">
+        {% if card.image_url %}
+            <img src="{{ card.image_url }}" alt="{{ card.name }}">
+        {% else %}
+            <div style="background: linear-gradient(135deg, #1b1632, #0a0812); width: 300px; height: 418px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-family: 'Cinzel', serif;">
+                {{ card.name }}
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="detail-info">
+        <h1 style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">{{ card.name }}</h1>
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 24px;">
+            <span class="badge badge-{{ card.rarity|lower }}">{{ card.rarity|capitalize }}</span>
+            {% if card.is_foil %}
+                <span class="badge foil-badge">Foil</span>
+            {% endif %}
+            {% if card.is_commander_candidate %}
+                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Can be your Commander">👑 Commander</span>
+            {% endif %}
+        </div>
+        
+        <table style="width: auto; margin-top: 0; background: none; border: none; margin-bottom: 24px;">
+            <tr>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Set Code</td>
+                <td style="border: none; padding: 8px 0; font-family: monospace; font-size: 1.1rem; color: var(--accent-cyan);">{{ card.set_code|upper }}</td>
+            </tr>
+            <tr>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Collector Number</td>
+                <td style="border: none; padding: 8px 0; font-family: monospace; font-size: 1.1rem;">{{ card.collector_number or '?' }}</td>
+            </tr>
+            <tr>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Price (USD)</td>
+                <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(card.price) }}</td>
+            </tr>
+            <tr>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Library Quantity</td>
+                <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-purple);">{{ card.quantity }} pcs</td>
+            </tr>
+        </table>
+        
+        {% if legalities %}
+            <h3 style="margin-top: 20px; margin-bottom: 12px; font-family: 'Cinzel', serif; font-size: 1.15rem;">Format Legality</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 24px;">
+                {% for format, status in legalities.items() %}
+                    {% if format in ['standard', 'modern', 'commander', 'pioneer', 'legacy', 'pauper', 'vintage'] %}
+                        <div style="display: flex; flex-direction: column; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px; align-items: center; justify-content: center;">
+                            <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">{{ format|capitalize }}</span>
+                            <span style="font-size: 0.75rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; display: inline-block; text-align: center;
+                                {% if status == 'legal' %}
+                                    background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3);
+                                {% elif status == 'banned' %}
+                                    background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3);
+                                {% elif status == 'restricted' %}
+                                    background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);
+                                {% else %}
+                                    background: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.3);
+                                {% endif %}">
+                                {{ status|replace('_', ' ')|upper }}
+                            </span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <h3 style="margin-top: 24px; margin-bottom: 12px; font-family: 'Cinzel', serif; font-size: 1.15rem;">Deck Placements</h3>
+        {% if decks %}
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px;">
+                {% for d in decks %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px;">
+                        <div>
+                            <a href="/deck/{{ d.id }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: 600; font-size: 0.95rem;">{{ d.name }}</a>
+                            <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); margin-left: 8px; font-weight: 600;">{{ d.format }}</span>
+                        </div>
+                        <span style="font-size: 0.85rem; font-weight: 700; color: var(--accent-purple);">{{ d.quantity }}x Copies</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px; font-style: italic;">This card is not currently assigned to any spell decks.</p>
+        {% endif %}
+
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 30px;">
+            <a href="/" class="btn btn-secondary">Back to Library</a>
+            {% if scryfall_url %}
+                <a href="{{ scryfall_url }}" target="_blank" class="btn" style="background: linear-gradient(135deg, #ff4e50, #f9d423); color: #0c0a1c; box-shadow: 0 4px 12px rgba(255,78,80,0.25); text-shadow: none;">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: middle; margin-right: 6px;">
+                        <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/>
+                        <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 1 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
+                    </svg>
+                    <span style="font-weight: 700;">View on Scryfall</span>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

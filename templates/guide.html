@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}How-To Guide - The Magicvault{% endblock %}
+
+{% block content %}
+<style>
+    .guide-header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid rgba(var(--accent-purple-rgb), 0.2);
+        padding-bottom: 12px;
+    }
+
+    .guide-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        margin-top: 20px;
+    }
+
+    .guide-card {
+        background: rgba(255, 255, 255, 0.015);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .guide-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--accent-purple);
+        box-shadow: 0 12px 30px rgba(var(--accent-purple-rgb), 0.15);
+    }
+
+    .guide-icon {
+        font-size: 2.2rem;
+        margin-bottom: 8px;
+    }
+
+    .guide-title {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: var(--accent-gold);
+        margin: 0;
+    }
+
+    .guide-body {
+        font-size: 0.92rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .guide-tag {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        background: rgba(255,255,255,0.05);
+        color: var(--text-muted);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--panel-border);
+        display: inline-block;
+        margin-right: 4px;
+        margin-bottom: 6px;
+    }
+
+    .code-span {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        color: var(--accent-cyan);
+    }
+
+    ul.guide-list {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    ul.guide-list li {
+        margin-bottom: 8px;
+    }
+</style>
+
+<div class="guide-header">
+    <h1 style="margin: 0; border: none; padding: 0;">How-To Guide</h1>
+    <p style="color: var(--text-muted); margin: 4px 0 0 0; font-size: 0.95rem;">Master the tools and spells of The Magicvault collection and deck builder.</p>
+</div>
+
+<div class="guide-grid">
+    <!-- Section 1: Collection -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">🗂️</div>
+            <h3 class="guide-title">Collection Library</h3>
+        </div>
+        <p class="guide-body">
+            Catalog and monitor the value of your physical Magic: The Gathering card inventory.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Summon Card</strong>: Toggle the **Summon** button to slide open a compact inline form, then add a card using its official 3-letter Set Code (e.g. <span class="code-span">NEO</span>) and Collector Number (e.g. <span class="code-span">15</span>). Your Summon drawer state and last entered Set Code are automatically saved to allow fast, mouse-free consecutive entries (the system auto-focuses the Collector # field on page reload).</li>
+            <li><strong>Foil Printings</strong>: Check the **Foil** option before summoning to track physical foil cards and calculate foil pricing.</li>
+            <li><strong>Sort & Filter</strong>: Sort your collection cards dynamically by Name, Price, Quantity, CMC mana cost, or Collector Number using the dropdown menu. You can toggle the **Filters** button to reveal a collapsible Advanced Filters panel. This drawer lets you multi-select options across Colors, Sets, Types, Rarities, Finish (Foil/Non-Foil), and Legality (Commander eligibility and Banned Everywhere filter) simultaneously. Your filter state is saved locally.</li>
+            <li><strong>Real-time Value Snapshot</strong>: Track your library's financial value over time. Automatically takes periodic snapshots of your total value.</li>
+            <li><strong>Price Refresh</strong>: Refresh card pricing on the Dashboard in bulk via Scryfall. The Dashboard displays the exact local timestamp of the last successful refresh.</li>
+        </ul>
+    </div>
+
+    <!-- Section 2: Search -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">🔍</div>
+            <h3 class="guide-title">Advanced Search Syntax</h3>
+        </div>
+        <p class="guide-body">
+            Search your collection with Scryfall-like search filters. Type filters directly into the Search box:
+        </p>
+        <div style="margin: 4px 0;">
+            <span class="guide-tag">type:creature / t:instant</span>
+            <span class="guide-tag">color:w / c:u / c:r</span>
+            <span class="guide-tag">cmc>=5 / cmc:3 / cmc<=2</span>
+            <span class="guide-tag">rarity:mythic / r:rare</span>
+            <span class="guide-tag">is:foil / is:nonfoil</span>
+            <span class="guide-tag">is:commander / is:cmdr</span>
+            <span class="guide-tag">is:banned / is:illegal</span>
+        </div>
+        <p class="guide-body" style="font-size: 0.85rem; color: var(--accent-cyan); font-style: italic;">
+            * Tip: Chaining works! E.g. "type:creature c:w cmc>=5" finds white creatures costing 5+ mana. General words like "mythic instant" work too!
+        </p>
+    </div>
+
+    <!-- Section 3: Deck Builder -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">🛡️</div>
+            <h3 class="guide-title">Spell Decks</h3>
+        </div>
+        <p class="guide-body">
+            Create, build, and check MTG decks bound to the cards in your collection.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Collection-Bound</strong>: You can only build decks using cards that you physically own. The builder shows how many copies you own vs how many are currently in the deck.</li>
+            <li><strong>Type-to-Filter Search</strong>: Search your available cards by name, type (e.g. `creature`, `instant`), or color (`red`, `green`, `c:w`) directly in the search input above the card selector. Sort choices dynamically by Name, Price, Available Qty, or CMC mana cost.</li>
+            <li><strong>Legality Check</strong>: Automatically queries Scryfall when adding cards to ensure they are legal in your chosen format (Standard, Modern, Commander, etc.). Banned cards are blocked.</li>
+            <li><strong>Basic Land Summoner</strong>: Quickly add lands (Plains, Island, Swamp, Mountain, Forest) in any quantity. The system automatically registers them in your collection as $0.00 cards.</li>
+            <li><strong>Deck Placements</strong>: View any card's detail page to check which spell decks it is currently assigned to, including the format and copy counts.</li>
+        </ul>
+    </div>
+
+    <!-- Section 4: Importers -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">📥</div>
+            <h3 class="guide-title">Deck Importers</h3>
+        </div>
+        <p class="guide-body">
+            Import entire decks in seconds without entering cards manually.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Precon Database</strong>: Browse from over 2,700+ official preconstructed decks (Commander precons, Theme decks, etc.) from MTG history and import them in one click.</li>
+            <li><strong>Copy-Paste List</strong>: Paste standard text lists (e.g. <span class="code-span">1 Sol Ring</span>, <span class="code-span">1x Elesh Norn</span>).</li>
+            <li><strong>Auto-Collection Sync</strong>: Since decks require owned cards, the importer automatically adds the deck's cards to your collection database (or increases your quantities) during import.</li>
+        </ul>
+    </div>
+
+    <!-- Section 5: Tokens & Art Cards -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">🪙</div>
+            <h3 class="guide-title">Tokens & Art Series</h3>
+        </div>
+        <p class="guide-body">
+            Track and catalog your physical Battlefield Tokens and Art Series collectible cards.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Tokens Tracker</strong>: Manage active token/emblem quantities. Supports a Quick Summon panel for popular tokens (Treasure, Food, Zombies, Clues).</li>
+            <li><strong>Art Series Tracker</strong>: Keeps catalog of textless art cards. Supports a Quick Add panel for popular Planeswalker art prints.</li>
+            <li><strong>Flexible Searching</strong>: Supports parent-child set relations (e.g. searching <span class="code-span">WOE</span> #<span class="code-span">15</span> correctly matches <span class="code-span">TWOE</span> #<span class="code-span">15</span> token and <span class="code-span">AWOE</span> #<span class="code-span">15</span> art card).</li>
+        </ul>
+    </div>
+
+    <!-- Section 6: Analytics & Playtest -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">📊</div>
+            <h3 class="guide-title">Analytics & Playtest</h3>
+        </div>
+        <p class="guide-body">
+            Analyze your deck statistics and simulate hands.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Deck Curve & Pips</strong>: View a vertical non-land Mana Curve chart, color mana symbol pip counts, and card category breakdowns.</li>
+            <li><strong>Starting Hand Simulator</strong>: Draw test starting hands of 7 cards. You can toggle **Mark Commander** on any card in the deck list to designate it as your Commander; doing so will exclude it from playtest hand shuffles.</li>
+            <li><strong>Mulligan Draw Rules</strong>: Click "Mulligan" to shuffle and draw one card fewer (6, 5, 4, etc.) following official rules.</li>
+            <li><strong>Image Integrations</strong>: Renders high-quality card images fetched from Scryfall.</li>
+            <li><strong>Spells Analytics</strong>: The Top 5 Valuable Cards analytics rankings on the Dashboard automatically filter out basic lands (Plains, Island, Swamp, Mountain, Forest, Wastes) to give you an accurate view of your high-value spell inventory.</li>
+            <li><strong>LGS Deal Checker & Binder Calculator</strong>: Located on the Wishlist page, look up Scryfall prices for any printing on the fly, compare with shop asking prices to calculate markup/discount metrics, check local inventory status, view compatible decks, and quick-add cards.</li>
+        </ul>
+    </div>
+
+    <!-- Section 7: Wishlist -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">📝</div>
+            <h3 class="guide-title">Wishlist Tracker</h3>
+        </div>
+        <p class="guide-body">
+            Keep track of cards you want to acquire without affecting your deck-building limits.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Add Wanted Cards</strong>: Use **Search By Name** to quickly search Scryfall, view printings, and select normal or foil versions to add to your wishlist. You can sort the results by Release Date, Price, or Set Name. Alternatively, use manual input for specific Set Codes and Collector Numbers.</li>
+            <li><strong>Isolate Wanted Cards</strong>: Cards in your wishlist are stored separately from your active library. You cannot add them to decks until they are officially claimed.</li>
+            <li><strong>Acquisition Estimates</strong>: The wishlist header automatically sums up the total wanted quantities and computes the estimated USD price to purchase them.</li>
+            <li><strong>Claim Transfer</strong>: When you acquire a wishlist card, click the green **Claim** button located at the bottom of the card next to quantity controls to move it directly into your active library collection.</li>
+            <li><strong>Discard Overlay</strong>: Click the small floating close button (&times;) in the top-right corner of any wishlist card to remove it from your tracking list.</li>
+        </ul>
+    </div>
+
+    <!-- Section 8: Personalization -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">🎨</div>
+            <h3 class="guide-title">Personalization</h3>
+        </div>
+        <p class="guide-body">
+            Customize the visuals and aesthetics of your Magicvault dashboard.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Dynamic Highlight Themes</strong>: Use the theme selector dropdown located on the right side of the navigation bar to switch between five different themes.</li>
+            <li><strong>Premium Palettes</strong>: Choose from Cosmic Purple (default), Emerald Green, Embers Gold, Oceanic Cyan, or Vampiric Rose to dynamically shift all borders, button gradients, charts, and highlights.</li>
+            <li><strong>Instant Application</strong>: Themes are saved locally inside your browser's <span class="code-span">localStorage</span> and applied instantly when you reload the page.</li>
+        </ul>
+    </div>
+
+    <!-- Section 9: Purchase Helpers & Card Details -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">🛒</div>
+            <h3 class="guide-title">Purchase Helpers & Card Details</h3>
+        </div>
+        <p class="guide-body">
+            Evaluate, compare, and shop for cards using advanced purchasing features integrated within details modals.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Wishlist Shopping Cart Checklist</strong>: Check card checkboxes inside the Wishlist to select them for purchase. The system dynamically counts selected items and sums their prices in a floating **Cart Total** panel. Selected cards highlight with a sleek green border.</li>
+            <li><strong>Cheapest Printing Finder</strong>: Looking up a card's details scans all Scryfall printings. If a cheaper version exists, a cyan **View** button is shown to switch the modal. If it is already the cheapest version, a victory badge is shown.</li>
+            <li><strong>Marketplace Checkout Links</strong>: Provides one-click buttons to purchase cards directly on **TCGplayer** (blue), **Cardmarket** (red), or **Cardhoarder** (slate) matching store branding.</li>
+            <li><strong>Deck Synergy Matches</strong>: Evaluates format legality and color pool restrictions (e.g. Commander color identities) against your custom decks, rendering green (synergy), yellow (color mismatch), or red (illegal) status pills.</li>
+            <li><strong>Collection Details Modal</strong>: Left-click any card in your Collection grid to pop open details instantly. Standard Ctrl/Cmd/middle clicks or the **View Full Page Details** link navigate to the standalone shareable page.</li>
+            <li><strong>LGS Deal Checker Cockpit</strong>: In the Wishlist page's deal checker, view live total owned/needed counts, toggle Normal vs Foil pricing models by clicking the price pills, view matching deck synergy badges, and click the quick action buttons to instantly add cards to your Collection or Wishlist.</li>
+        </ul>
+    </div>
+
+    <!-- Section 10: Data Export (CSV) -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">📊</div>
+            <h3 class="guide-title">Data Export (CSV)</h3>
+        </div>
+        <p class="guide-body">
+            Download your tracked cards to open in Microsoft Excel, Google Sheets, or other spreadsheets.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Export Filtered Collection</strong>: Click the **Export CSV** button in the *Search Collection* control panel on the main page. It generates a CSV file of all cards currently matching your active filter, maintaining the selected sorting order.</li>
+            <li><strong>Export Filtered Wishlist</strong>: Click the **Export CSV** button next to the wishlist filter input. It exports your currently filtered wishlist items.</li>
+            <li><strong>Export Decks</strong>: Click the **Export CSV** button next to a deck's name on its details page. It downloads a CSV spreadsheet containing the deck's cards, set codes, collector numbers, foil status, Commander designation, prices, and quantities.</li>
+            <li><strong>Complete Data Fields</strong>: Exports include card name, set code, collector number, rarity, type line, mana value (CMC), colors, foil status, price, and owned quantity.</li>
+        </ul>
+    </div>
+
+    <!-- Section 11: Elite Showcase -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">⚜️</div>
+            <h3 class="guide-title">Elite Showcase</h3>
+        </div>
+        <p class="guide-body">
+            Share your most prestigious cards publicly with friends and the MTG community.
+        </p>
+        <ul class="guide-list">
+            <li><strong>Automated Top 5 Rankings</strong>: The public showcase page (<span class="code-span">/showcase</span>) dynamically identifies and displays the top 5 most valuable cards in your entire collection sorted by current price.</li>
+            <li><strong>Auto-Eviction Mechanics</strong>: As you summon new cards or card values fluctuate, the database automatically recalibrates rankings, evicting lower-valued cards to keep the Top 5 completely real-time.</li>
+            <li><strong>Anonymized Public Sharing</strong>: The showcase is exempted from vault passcodes. Anyone with the URL can view it, but private management routes (summon, edit, delete, decks, wishlist, and settings) remain completely hidden and locked.</li>
+            <li><strong>Copy Share Link</strong>: Click the **🔗 Copy Share Link** button to copy the showcase URL directly to your clipboard.</li>
+            <li><strong>Milestone XP Progress</strong>: Visual XP-style progress bar showing how close your Top 5 collection value is to major milestones ($100, $500, $1000, etc.).</li>
+            <li><strong>3D Tilt & Foil Shimmer</strong>: Showcase cards tilt dynamically based on cursor position. Foil prints shimmer with mouse-responsive holographic sheen shifts.</li>
+            <li><strong>Interactive Format Inspector</strong>: Visitors can click cards to inspect properties (CMC, Mana Cost, Printing, Rarity) and view a grid of exact format legalities (Standard, Commander, Modern, etc.) queried live from Scryfall.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    // Adjust navigation active tab
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        if (link.getAttribute('href') === '/guide') {
+            link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
+    });
+</script>
+{% endblock %}

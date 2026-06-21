@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unlock the Vault - The Magicvault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0b0914 0%, #120e25 50%, #05040a 100%);
+            --panel-bg: rgba(20, 16, 36, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #06b6d4;
+            --accent-purple: #a855f7;
+            --accent-purple-hover: #8b5cf6;
+            --accent-purple-rgb: 168, 85, 247;
+            --accent-purple-hover-rgb: 139, 92, 246;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --shadow-glow: 0 0 30px rgba(var(--accent-purple-rgb), 0.15);
+        }
+
+        /* Highlight Themes */
+        body.theme-cosmic {
+            --accent-purple: #a855f7;
+            --accent-purple-hover: #8b5cf6;
+            --accent-purple-rgb: 168, 85, 247;
+            --accent-purple-hover-rgb: 139, 92, 246;
+            --shadow-glow: 0 0 30px rgba(168, 85, 247, 0.15);
+        }
+        body.theme-emerald {
+            --accent-purple: #10b981;
+            --accent-purple-hover: #059669;
+            --accent-purple-rgb: 16, 185, 129;
+            --accent-purple-hover-rgb: 5, 150, 105;
+            --shadow-glow: 0 0 30px rgba(16, 185, 129, 0.15);
+        }
+        body.theme-embers {
+            --accent-purple: #f59e0b;
+            --accent-purple-hover: #d97706;
+            --accent-purple-rgb: 245, 158, 11;
+            --accent-purple-hover-rgb: 217, 119, 6;
+            --shadow-glow: 0 0 30px rgba(245, 158, 11, 0.15);
+        }
+        body.theme-oceanic {
+            --accent-purple: #06b6d4;
+            --accent-purple-hover: #0891b2;
+            --accent-purple-rgb: 6, 182, 212;
+            --accent-purple-hover-rgb: 8, 145, 178;
+            --shadow-glow: 0 0 30px rgba(6, 182, 212, 0.15);
+        }
+        body.theme-vampiric {
+            --accent-purple: #f43f5e;
+            --accent-purple-hover: #e11d48;
+            --accent-purple-rgb: 244, 63, 94;
+            --accent-purple-hover-rgb: 225, 29, 72;
+            --shadow-glow: 0 0 30px rgba(244, 63, 94, 0.15);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-attachment: fixed;
+            overflow: hidden;
+        }
+
+        .login-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), var(--shadow-glow);
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo {
+            font-family: 'Cinzel', serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input[type="password"]:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-hover));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(var(--accent-purple-hover-rgb), 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(var(--accent-purple-hover-rgb), 0.4);
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            color: #f43f5e;
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+            .logo {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // Apply theme immediately to prevent flashing
+        const savedTheme = localStorage.getItem('appHighlightTheme') || 'cosmic';
+        document.body.classList.add('theme-' + savedTheme);
+    </script>
+    <div class="login-card">
+        <div class="logo">THE MAGICVAULT</div>
+        <div class="subtitle">Enter passcode to unlock your vault</div>
+        
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <form method="POST">
+            <div class="input-group">
+                <label for="password">Vault Passcode</label>
+                <input type="password" id="password" name="password" autofocus required>
+            </div>
+            <button type="submit">Unlock</button>
+        </form>
+    </div>
+</body>
+</html>
