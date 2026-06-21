@@ -684,7 +684,7 @@
         <a href="/" class="nav-logo">The Magicvault</a>
         
         <div class="nav-controls-container">
-            {% if session.get('logged_in') %}
+            {% if session.get('user_id') %}
                 <button class="menu-toggle-btn" id="menuToggleBtn" aria-label="Toggle Menu">
                     <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
@@ -698,7 +698,7 @@
             {% endif %}
         </div>
 
-        {% if session.get('logged_in') %}
+        {% if session.get('user_id') %}
             <div class="nav-links-dropdown" id="navLinksDropdown">
                 <a href="/">Collection</a>
                 <a href="/wishlist">Wishlist</a>
@@ -710,7 +710,7 @@
                 <a href="/guide">Guide</a>
                 <a href="/releases">Release Notes</a>
                 <a href="/settings">Settings</a>
-                <a href="/logout" style="color: var(--accent-rose);">Logout</a>
+                <a href="/logout" style="color: var(--accent-rose);">Logout ({{ session.get('username') }})</a>
             </div>
         {% endif %}
     </nav>

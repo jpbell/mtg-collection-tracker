@@ -4,15 +4,15 @@
 
 {% block extra_head %}
     <!-- OpenGraph Rich Embed Previews -->
-    <meta property="og:title" content="My Magicvault Elite Showcase">
-    <meta property="og:description" content="Check out the top 5 most valuable MTG cards in my collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of my library)">
+    <meta property="og:title" content="{{ showcase_user.username }}'s Magicvault Elite Showcase">
+    <meta property="og:description" content="Check out the top 5 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of their library)">
     <meta property="og:type" content="website">
     {% if cards and cards[0].image_url %}
         <meta property="og:image" content="{{ cards[0].image_url }}">
     {% endif %}
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="My Magicvault Elite Showcase">
-    <meta name="twitter:description" content="Check out my top 5 most valuable MTG cards, valued at ${{ '%.2f'|format(total_value) }}!">
+    <meta name="twitter:title" content="{{ showcase_user.username }}'s Magicvault Elite Showcase">
+    <meta name="twitter:description" content="Check out the top 5 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}!">
 {% endblock %}
 
 {% block content %}
@@ -561,9 +561,9 @@
 </style>
 
 <div class="showcase-header">
-    <h1 class="showcase-title">⚜️ The Elite Showcase ⚜️</h1>
+    <h1 class="showcase-title">⚜️ {{ showcase_user.username }}'s Elite Showcase ⚜️</h1>
     <p class="showcase-subtitle">
-        A real-time public showcase of the top 5 most valuable Magic: The Gathering cards in my personal collection. 
+        A real-time public showcase of the top 5 most valuable Magic: The Gathering cards in {{ showcase_user.username }}'s personal collection. 
         As new cards are summoned, this collection dynamically updates to reflect the highest tier items.
     </p>
     <div style="display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 16px;">

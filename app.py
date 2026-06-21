@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy import func
@@ -11,38 +11,26 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 from werkzeug.security import generate_password_hash, check_password_hash
 
-def get_passcode_hash():
-    if os.path.exists('passcode.txt'):
-        try:
-            with open('passcode.txt', 'r') as f:
-                val = f.read().strip()
-                # Check if it is already a Werkzeug hash string
-                if val.startswith('pbkdf2:') or val.startswith('scrypt:') or val.startswith('bcrypt:'):
-                    return val
-                # Auto-upgrade plain text passcode to a cryptographic hash
-                h = generate_password_hash(val)
-                try:
-                    with open('passcode.txt', 'w') as wf:
-                        wf.write(h)
-                except:
-                    pass
-                return h
-        except:
-            pass
-    # Get from environment or fallback
-    plain = os.environ.get('APP_PASSWORD', 'magicvault')
-    if plain.startswith('pbkdf2:') or plain.startswith('scrypt:') or plain.startswith('bcrypt:'):
-        return plain
-    return generate_password_hash(plain)
-
-PASSWORD_HASH = get_passcode_hash()
+def scoped(model):
+    return model.query.filter_by(user_id=session.get('user_id'))
 
 @app.before_request
 def check_auth():
-    # Allow access to login route, public showcase, and static files without authentication
-    if request.path in ['/login', '/showcase'] or request.path.startswith('/static/'):
+    # Allow access to login route, register route, public showcase, and static files
+    path = request.path
+    if path in ['/login', '/register'] or path.startswith('/showcase') or path.startswith('/static/'):
         return
-    if not session.get('logged_in'):
+    
+    # If no users exist, redirect to registration/setup
+    try:
+        user_count = User.query.count()
+    except Exception:
+        user_count = 0
+        
+    if user_count == 0:
+        return redirect(url_for('register'))
+        
+    if not session.get('user_id'):
         return redirect(url_for('login'))
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -53,8 +41,14 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 # --- Models ---
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     set_code = db.Column(db.String(10), nullable=False)
     collector_number = db.Column(db.String(20))
@@ -100,11 +94,13 @@ class ReleaseNote(db.Model):
 
 class ValueSnapshot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     total_value = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Deck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(255))
     format = db.Column(db.String(50), default='Standard')
@@ -121,6 +117,7 @@ class DeckCard(db.Model):
 
 class Token(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     set_code = db.Column(db.String(10), nullable=True)
     collector_number = db.Column(db.String(20), nullable=True)
@@ -130,6 +127,7 @@ class Token(db.Model):
 
 class ArtCard(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     set_code = db.Column(db.String(10), nullable=True)
     collector_number = db.Column(db.String(20), nullable=True)
@@ -140,6 +138,7 @@ class ArtCard(db.Model):
 
 class WishlistCard(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     set_code = db.Column(db.String(10), nullable=False)
     collector_number = db.Column(db.String(20))
@@ -149,15 +148,33 @@ class WishlistCard(db.Model):
     is_foil = db.Column(db.Boolean, default=False, server_default='0')
     quantity = db.Column(db.Integer, default=1)
 
-with app.app_context():
+def upgrade_database_schema():
     db.create_all()
+    inspector = db.inspect(db.engine)
+    tables_to_upgrade = ['card', 'deck', 'token', 'art_card', 'value_snapshot', 'wishlist_card']
+    for table in tables_to_upgrade:
+        if inspector.has_table(table):
+            columns = [c['name'] for c in inspector.get_columns(table)]
+            if 'user_id' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER REFERENCES user(id)"))
+                except Exception as e:
+                    print(f"Failed to alter table {table} to add user_id: {e}")
 
-def record_snapshot():
-    cards = Card.query.all()
-    art_cards = ArtCard.query.all()
+with app.app_context():
+    upgrade_database_schema()
+
+def record_snapshot(user_id=None):
+    if not user_id:
+        user_id = session.get('user_id')
+    if not user_id:
+        return
+    cards = Card.query.filter_by(user_id=user_id).all()
+    art_cards = ArtCard.query.filter_by(user_id=user_id).all()
     total_value = sum((c.price or 0.0) * c.quantity for c in cards) + sum((ac.price or 0.0) * ac.quantity for ac in art_cards)
     
-    last_snapshot = ValueSnapshot.query.order_by(ValueSnapshot.timestamp.desc()).first()
+    last_snapshot = ValueSnapshot.query.filter_by(user_id=user_id).order_by(ValueSnapshot.timestamp.desc()).first()
     if last_snapshot:
         time_diff = (datetime.utcnow() - last_snapshot.timestamp).total_seconds()
         if time_diff < 60:
@@ -166,20 +183,20 @@ def record_snapshot():
             return
             
     if not last_snapshot or abs(last_snapshot.total_value - total_value) > 0.001:
-        snapshot = ValueSnapshot(total_value=total_value)
+        snapshot = ValueSnapshot(total_value=total_value, user_id=user_id)
         db.session.add(snapshot)
         db.session.commit()
 
 # --- Routes ---
 @app.route('/')
 def index():
-    cards = Card.query.order_by(Card.id.desc()).all()
+    cards = scoped(Card).order_by(Card.id.desc()).all()
     total_value = sum((c.price or 0.0) * c.quantity for c in cards)
-    if ValueSnapshot.query.count() == 0 and len(cards) > 0:
+    if scoped(ValueSnapshot).count() == 0 and len(cards) > 0:
         record_snapshot()
         
     # Fetch all custom decks for synergy suggestions
-    decks = Deck.query.all()
+    decks = scoped(Deck).all()
     decks_data = []
     for d in decks:
         deck_colors = set()
@@ -207,11 +224,12 @@ def add_card():
         is_foil = 'is_foil' in request.form
         
         # 1. Look for an exact match (same set, collector #, and foil status)
-        existing_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=is_foil).first()
+        existing_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=is_foil, user_id=session.get('user_id')).first()
         
         # 2. Fallback: match by name, set, and foil status for legacy/seeded records that have empty/null collector numbers
         if not existing_card:
             existing_card = Card.query.filter(
+                Card.user_id == session.get('user_id'),
                 Card.name == d['name'],
                 Card.set_code == set_code,
                 Card.is_foil == is_foil,
@@ -252,7 +270,8 @@ def add_card():
                                 cmc=cmc,
                                 type_line=type_line,
                                 colors=colors,
-                                is_illegal=is_illegal))
+                                is_illegal=is_illegal,
+                                user_id=session.get('user_id')))
             db.session.commit()
             record_snapshot()
             flash(f"Successfully summoned {d['name']} ({'Foil' if is_foil else 'Non-Foil'}) for ${price:.2f}!", "success")
@@ -262,7 +281,7 @@ def add_card():
 
 @app.route('/update_quantity/<int:id>/<action>')
 def update_quantity(id, action):
-    card = Card.query.get_or_404(id)
+    card = scoped(Card).filter_by(id=id).first_or_404()
     if action == 'add': card.quantity += 1
     elif action == 'sub' and card.quantity > 0: card.quantity -= 1
     db.session.commit()
@@ -271,15 +290,16 @@ def update_quantity(id, action):
 
 @app.route('/delete/<int:id>')
 def delete_card(id):
+    card = scoped(Card).filter_by(id=id).first_or_404()
     DeckCard.query.filter_by(card_id=id).delete()
-    db.session.delete(Card.query.get_or_404(id))
+    db.session.delete(card)
     db.session.commit()
     record_snapshot()
     return redirect(url_for('index'))
 
 @app.route('/card/<int:id>')
 def card_detail(id):
-    card = Card.query.get_or_404(id)
+    card = scoped(Card).filter_by(id=id).first_or_404()
     
     # Query deck associations
     deck_associations = DeckCard.query.filter_by(card_id=card.id).all()
@@ -364,7 +384,7 @@ def get_set_total_cards(set_code):
 @app.route('/dashboard')
 def dashboard():
     record_snapshot()
-    history = ValueSnapshot.query.order_by(ValueSnapshot.timestamp.asc()).all()
+    history = scoped(ValueSnapshot).order_by(ValueSnapshot.timestamp.asc()).all()
     history_data = [
         {
             'timestamp': h.timestamp.isoformat() + 'Z',
@@ -373,17 +393,17 @@ def dashboard():
         for h in history
     ]
     
-    total_cards = (db.session.query(func.sum(Card.quantity)).scalar() or 0) + (db.session.query(func.sum(ArtCard.quantity)).scalar() or 0)
-    total_value = (db.session.query(func.sum(Card.price * Card.quantity)).scalar() or 0) + sum((ac.price or 0.0) * ac.quantity for ac in ArtCard.query.all())
-    rarity_stats = db.session.query(Card.rarity, func.sum(Card.quantity)).group_by(Card.rarity).all()
+    total_cards = (db.session.query(func.sum(Card.quantity)).filter(Card.user_id == session.get('user_id')).scalar() or 0) + (db.session.query(func.sum(ArtCard.quantity)).filter(ArtCard.user_id == session.get('user_id')).scalar() or 0)
+    total_value = (db.session.query(func.sum(Card.price * Card.quantity)).filter(Card.user_id == session.get('user_id')).scalar() or 0) + sum((ac.price or 0.0) * ac.quantity for ac in scoped(ArtCard).all())
+    rarity_stats = db.session.query(Card.rarity, func.sum(Card.quantity)).filter(Card.user_id == session.get('user_id')).group_by(Card.rarity).all()
     
     # Value changes calculations
     now = datetime.utcnow()
-    earliest_snapshot = ValueSnapshot.query.order_by(ValueSnapshot.timestamp.asc()).first()
+    earliest_snapshot = scoped(ValueSnapshot).order_by(ValueSnapshot.timestamp.asc()).first()
     
     def get_value_at_time(target_dt):
-        before = ValueSnapshot.query.filter(ValueSnapshot.timestamp <= target_dt).order_by(ValueSnapshot.timestamp.desc()).first()
-        after = ValueSnapshot.query.filter(ValueSnapshot.timestamp >= target_dt).order_by(ValueSnapshot.timestamp.asc()).first()
+        before = scoped(ValueSnapshot).filter(ValueSnapshot.timestamp <= target_dt).order_by(ValueSnapshot.timestamp.desc()).first()
+        after = scoped(ValueSnapshot).filter(ValueSnapshot.timestamp >= target_dt).order_by(ValueSnapshot.timestamp.asc()).first()
         if before and after:
             if abs((target_dt - before.timestamp).total_seconds()) < abs((after.timestamp - target_dt).total_seconds()):
                 return before.total_value
@@ -414,7 +434,7 @@ def dashboard():
         basic_lands = {'plains', 'island', 'swamp', 'mountain', 'forest', 'wastes', 'waste'}
         return name_lower in basic_lands
 
-    all_cards = Card.query.all()
+    all_cards = scoped(Card).all()
     non_basic_lands = [c for c in all_cards if not is_basic_land(c)]
     top_valuable_list = sorted(non_basic_lands, key=lambda c: c.price * c.quantity, reverse=True)[:5]
     top_valuable = []
@@ -511,8 +531,8 @@ def dashboard():
     set_stats = sorted(set_stats, key=lambda x: x['value'], reverse=True)
 
     # --- NEW: Foil vs Non-Foil Stats ---
-    total_foil = db.session.query(func.sum(Card.quantity)).filter(Card.is_foil == True).scalar() or 0
-    total_non_foil = db.session.query(func.sum(Card.quantity)).filter(Card.is_foil == False).scalar() or 0
+    total_foil = db.session.query(func.sum(Card.quantity)).filter(Card.is_foil == True, Card.user_id == session.get('user_id')).scalar() or 0
+    total_non_foil = db.session.query(func.sum(Card.quantity)).filter(Card.is_foil == False, Card.user_id == session.get('user_id')).scalar() or 0
     foil_percentage = (total_foil / total_cards * 100) if total_cards > 0 else 0
     foil_stats = {
         'foil': total_foil,
@@ -553,9 +573,9 @@ def dashboard():
     type_stats = [{'type_name': k, 'count': v} for k, v in type_counts.items() if v > 0]
 
     # --- NEW: Recent Additions Feed (Cards, Tokens, Art Cards combined) ---
-    recent_cards = Card.query.order_by(Card.id.desc()).limit(5).all()
-    recent_tokens = Token.query.order_by(Token.id.desc()).limit(5).all()
-    recent_art = ArtCard.query.order_by(ArtCard.id.desc()).limit(5).all()
+    recent_cards = scoped(Card).order_by(Card.id.desc()).limit(5).all()
+    recent_tokens = scoped(Token).order_by(Token.id.desc()).limit(5).all()
+    recent_art = scoped(ArtCard).order_by(ArtCard.id.desc()).limit(5).all()
     
     combined_recent = []
     for c in recent_cards:
@@ -591,12 +611,12 @@ def dashboard():
     combined_recent = sorted(combined_recent, key=lambda x: x['id'], reverse=True)[:5]
 
     # --- NEW: Set Completion and Missing Cards Stats ---
-    set_codes = db.session.query(Card.set_code).distinct().all()
+    set_codes = db.session.query(Card.set_code).filter(Card.user_id == session.get('user_id')).distinct().all()
     set_completion = []
     for (s_code,) in set_codes:
         s_code_upper = s_code.upper()
         # Count unique collector numbers owned in this set
-        owned_unique = db.session.query(func.count(Card.collector_number.distinct())).filter(Card.set_code == s_code).scalar() or 0
+        owned_unique = db.session.query(func.count(Card.collector_number.distinct())).filter(Card.set_code == s_code, Card.user_id == session.get('user_id')).scalar() or 0
         total_in_set = get_set_total_cards(s_code)
         
         missing = max(0, total_in_set - owned_unique) if total_in_set > 0 else 0
@@ -661,8 +681,8 @@ def view_releases():
 
 @app.route('/refresh_prices')
 def refresh_prices():
-    cards = Card.query.all()
-    art_cards = ArtCard.query.all()
+    cards = scoped(Card).all()
+    art_cards = scoped(ArtCard).all()
     
     if not cards and not art_cards:
         flash("No cards in collection to update.", "info")
@@ -794,19 +814,21 @@ def search_scryfall_prints():
                 collector_number = item.get('collector_number', '')
                 
                 # Fetch owned quantities from local database
-                owned_total = db.session.query(func.sum(Card.quantity)).filter(func.lower(Card.name) == func.lower(name)).scalar() or 0
+                owned_total = db.session.query(func.sum(Card.quantity)).filter(func.lower(Card.name) == func.lower(name), Card.user_id == session.get('user_id')).scalar() or 0
                 owned_spec = db.session.query(func.sum(Card.quantity)).filter(
                     func.lower(Card.name) == func.lower(name),
                     func.lower(Card.set_code) == func.lower(set_code),
-                    func.lower(Card.collector_number) == func.lower(collector_number)
+                    func.lower(Card.collector_number) == func.lower(collector_number),
+                    Card.user_id == session.get('user_id')
                 ).scalar() or 0
                 
                 # Fetch wishlist quantities from local database
-                wish_total = db.session.query(func.sum(WishlistCard.quantity)).filter(func.lower(WishlistCard.name) == func.lower(name)).scalar() or 0
+                wish_total = db.session.query(func.sum(WishlistCard.quantity)).filter(func.lower(WishlistCard.name) == func.lower(name), WishlistCard.user_id == session.get('user_id')).scalar() or 0
                 wish_spec = db.session.query(func.sum(WishlistCard.quantity)).filter(
                     func.lower(WishlistCard.name) == func.lower(name),
                     func.lower(WishlistCard.set_code) == func.lower(set_code),
-                    func.lower(WishlistCard.collector_number) == func.lower(collector_number)
+                    func.lower(WishlistCard.collector_number) == func.lower(collector_number),
+                    WishlistCard.user_id == session.get('user_id')
                 ).scalar() or 0
                 
                 results.append({
@@ -837,12 +859,12 @@ def search_scryfall_prints():
 # --- Wishlist Routes ---
 @app.route('/wishlist')
 def view_wishlist():
-    wishlist = WishlistCard.query.order_by(WishlistCard.id.desc()).all()
+    wishlist = scoped(WishlistCard).order_by(WishlistCard.id.desc()).all()
     total_qty = sum(item.quantity for item in wishlist)
     total_value = sum((item.price or 0.0) * item.quantity for item in wishlist)
     
     # Fetch all custom decks for synergy suggestions
-    decks = Deck.query.all()
+    decks = scoped(Deck).all()
     decks_data = []
     for d in decks:
         deck_colors = set()
@@ -873,7 +895,8 @@ def add_to_wishlist():
     existing = WishlistCard.query.filter_by(
         set_code=set_code, 
         collector_number=collector_number, 
-        is_foil=is_foil
+        is_foil=is_foil,
+        user_id=session.get('user_id')
     ).first()
     
     if existing:
@@ -903,7 +926,8 @@ def add_to_wishlist():
                 image_url=image_url,
                 price=price,
                 is_foil=is_foil,
-                quantity=1
+                quantity=1,
+                user_id=session.get('user_id')
             )
             db.session.add(new_item)
             db.session.commit()
@@ -917,7 +941,7 @@ def add_to_wishlist():
 
 @app.route('/wishlist/update_quantity/<int:card_id>/<string:action>')
 def update_wishlist_quantity(card_id, action):
-    item = WishlistCard.query.get_or_404(card_id)
+    item = scoped(WishlistCard).filter_by(id=card_id).first_or_404()
     if action == 'add':
         item.quantity += 1
     elif action == 'sub':
@@ -930,7 +954,7 @@ def update_wishlist_quantity(card_id, action):
 
 @app.route('/wishlist/delete/<int:card_id>')
 def delete_wishlist_card(card_id):
-    item = WishlistCard.query.get_or_404(card_id)
+    item = scoped(WishlistCard).filter_by(id=card_id).first_or_404()
     db.session.delete(item)
     db.session.commit()
     flash("Card removed from wishlist.", "info")
@@ -938,14 +962,15 @@ def delete_wishlist_card(card_id):
 
 @app.route('/wishlist/claim/<int:card_id>')
 def claim_wishlist_card(card_id):
-    item = WishlistCard.query.get_or_404(card_id)
+    item = scoped(WishlistCard).filter_by(id=card_id).first_or_404()
     
     # Add to Card collection model
     # First check if this card is already in the main collection
     existing_collection = Card.query.filter_by(
         set_code=item.set_code,
         collector_number=item.collector_number,
-        is_foil=item.is_foil
+        is_foil=item.is_foil,
+        user_id=session.get('user_id')
     ).first()
     
     if existing_collection:
@@ -990,7 +1015,8 @@ def claim_wishlist_card(card_id):
             mana_cost=mana_cost,
             cmc=cmc,
             type_line=type_line,
-            is_illegal=is_illegal
+            is_illegal=is_illegal,
+            user_id=session.get('user_id')
         )
         db.session.add(new_card)
         
@@ -1004,7 +1030,7 @@ def claim_wishlist_card(card_id):
 
 @app.route('/decks')
 def list_decks():
-    decks = Deck.query.all()
+    decks = scoped(Deck).all()
     
     total_decks = len(decks)
     total_cards = 0
@@ -1031,7 +1057,7 @@ def create_deck():
     description = request.form['description'].strip()
     fmt = request.form.get('format', 'Standard')
     if name:
-        deck = Deck(name=name, description=description, format=fmt)
+        deck = Deck(name=name, description=description, format=fmt, user_id=session.get('user_id'))
         db.session.add(deck)
         db.session.commit()
         flash(f"Successfully created deck '{name}' ({fmt})!", "success")
@@ -1041,12 +1067,12 @@ def create_deck():
 
 @app.route('/deck/<int:deck_id>')
 def view_deck(deck_id):
-    deck = Deck.query.get_or_404(deck_id)
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
     
     total_cards = sum(dc.quantity for dc in deck.cards if dc.card)
     total_value = sum((dc.card.price or 0.0) * dc.quantity for dc in deck.cards if dc.card)
     
-    all_collection_cards = Card.query.all()
+    all_collection_cards = scoped(Card).all()
     available_cards = []
     
     for c in all_collection_cards:
@@ -1138,11 +1164,11 @@ def view_deck(deck_id):
 
 @app.route('/deck/<int:deck_id>/add', methods=['POST'])
 def add_to_deck(deck_id):
-    deck = Deck.query.get_or_404(deck_id)
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
     card_id = int(request.form['card_id'])
     quantity = int(request.form['quantity'])
     
-    collection_card = Card.query.get_or_404(card_id)
+    collection_card = scoped(Card).filter_by(id=card_id).first_or_404()
     
     # 1. Check format legality via Scryfall API
     format_key = deck.format.lower()
@@ -1207,6 +1233,8 @@ def add_to_deck(deck_id):
 @app.route('/deck/<int:deck_id>/update_quantity/<int:deck_card_id>/<action>')
 def update_deck_card_quantity(deck_id, deck_card_id, action):
     dc = DeckCard.query.get_or_404(deck_card_id)
+    if dc.deck.user_id != session.get('user_id'):
+        abort(404)
     deck = dc.deck
     collection_card = dc.card
     
@@ -1257,6 +1285,8 @@ def update_deck_card_quantity(deck_id, deck_card_id, action):
 @app.route('/deck/<int:deck_id>/remove/<int:deck_card_id>')
 def remove_from_deck(deck_id, deck_card_id):
     dc = DeckCard.query.get_or_404(deck_card_id)
+    if dc.deck.user_id != session.get('user_id'):
+        abort(404)
     card_name = dc.card.name
     db.session.delete(dc)
     db.session.commit()
@@ -1265,9 +1295,9 @@ def remove_from_deck(deck_id, deck_card_id):
 
 @app.route('/deck/<int:deck_id>/toggle_commander/<int:deck_card_id>')
 def toggle_commander(deck_id, deck_card_id):
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
     dc = DeckCard.query.get_or_404(deck_card_id)
+    if dc.deck.user_id != session.get('user_id'):
+        abort(404)
     if dc.deck_id != deck_id:
         flash("Card does not belong to this deck.", "error")
         return redirect(url_for('view_deck', deck_id=deck_id))
@@ -1290,7 +1320,7 @@ def toggle_commander(deck_id, deck_card_id):
 
 @app.route('/deck/delete/<int:deck_id>')
 def delete_deck(deck_id):
-    deck = Deck.query.get_or_404(deck_id)
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
     name = deck.name
     db.session.delete(deck)
     db.session.commit()
@@ -1299,7 +1329,7 @@ def delete_deck(deck_id):
 
 @app.route('/deck/<int:deck_id>/add_basic_lands', methods=['POST'])
 def add_basic_lands(deck_id):
-    deck = Deck.query.get_or_404(deck_id)
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
     land_type = request.form['land_type'].capitalize() # Plains, Island, Swamp, Mountain, Forest
     quantity = int(request.form['quantity'])
     
@@ -1320,7 +1350,7 @@ def add_basic_lands(deck_id):
     collector_number = land_info['collector_number']
     
     # Check if card already exists in the collection (set ANA, collector_number, non-foil)
-    collection_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=False).first()
+    collection_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=False, user_id=session.get('user_id')).first()
     
     if not collection_card:
         # Fetch basic land details from Scryfall API once
@@ -1342,7 +1372,8 @@ def add_basic_lands(deck_id):
                     cmc=int(d.get('cmc', 0.0)),
                     type_line=d.get('type_line', ''),
                     colors=",".join(d.get('colors', [])),
-                    is_illegal=False
+                    is_illegal=False,
+                    user_id=session.get('user_id')
                 )
                 db.session.add(collection_card)
                 db.session.commit()
@@ -1361,7 +1392,8 @@ def add_basic_lands(deck_id):
                     cmc=0,
                     type_line=f'Basic Land — {land_info["name"]}',
                     colors='',
-                    is_illegal=False
+                    is_illegal=False,
+                    user_id=session.get('user_id')
                 )
                 db.session.add(collection_card)
                 db.session.commit()
@@ -1394,7 +1426,7 @@ def add_basic_lands(deck_id):
 
 @app.route('/backfill')
 def backfill_cards():
-    cards = Card.query.filter((Card.type_line == None) | (Card.type_line == '')).all()
+    cards = scoped(Card).filter((Card.type_line == None) | (Card.type_line == '')).all()
     count = 0
     for card in cards:
         time.sleep(0.1) # Rate limit
@@ -1460,7 +1492,7 @@ def parse_decklist_text(text):
 
 def process_imported_cards(deck_name, format_name, description, raw_cards):
     # Create the new Deck
-    deck = Deck(name=deck_name, description=description, format=format_name)
+    deck = Deck(name=deck_name, description=description, format=format_name, user_id=session.get('user_id'))
     db.session.add(deck)
     db.session.commit() # Save deck to get deck.id
     
@@ -1543,7 +1575,8 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
         db_card = Card.query.filter_by(
             name=sc['name'], 
             set_code=sc['set'].upper(), 
-            collector_number=sc['collector_number']
+            collector_number=sc['collector_number'],
+            user_id=session.get('user_id')
         ).first()
         
         needed_qty = rc['quantity']
@@ -1576,7 +1609,8 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
                 type_line=sc.get('type_line', ''),
                 colors=",".join(sc.get('colors', [])),
                 quantity=needed_qty,
-                is_illegal=is_illegal
+                is_illegal=is_illegal,
+                user_id=session.get('user_id')
             )
             db.session.add(db_card)
             db.session.flush()
@@ -1748,7 +1782,7 @@ def get_collector_number_options(cn):
 
 @app.route('/tokens')
 def list_tokens():
-    tokens = Token.query.all()
+    tokens = scoped(Token).all()
     return render_template('tokens.html', tokens=tokens)
 
 @app.route('/tokens/add', methods=['POST'])
@@ -1789,7 +1823,8 @@ def add_token():
                     existing_token = Token.query.filter_by(
                         name=d['name'], 
                         set_code=d['set'].upper(), 
-                        collector_number=d['collector_number']
+                        collector_number=d['collector_number'],
+                        user_id=session.get('user_id')
                     ).first()
                     
                     image_url = d.get('image_uris', {}).get('normal') or d.get('image_uris', {}).get('large')
@@ -1808,7 +1843,8 @@ def add_token():
                             collector_number=d['collector_number'],
                             type_line=d.get('type_line', 'Token'),
                             image_url=image_url,
-                            quantity=1
+                            quantity=1,
+                            user_id=session.get('user_id')
                         ))
                         db.session.commit()
                         flash(f"Successfully summoned {d['name']} token!", "success")
@@ -1837,7 +1873,8 @@ def add_token():
                     existing_token = Token.query.filter_by(
                         name=d['name'], 
                         set_code=d['set'].upper(), 
-                        collector_number=d['collector_number']
+                        collector_number=d['collector_number'],
+                        user_id=session.get('user_id')
                     ).first()
                     
                     image_url = d.get('image_uris', {}).get('normal') or d.get('image_uris', {}).get('large')
@@ -1856,7 +1893,8 @@ def add_token():
                             collector_number=d['collector_number'],
                             type_line=d.get('type_line', 'Token'),
                             image_url=image_url,
-                            quantity=1
+                            quantity=1,
+                            user_id=session.get('user_id')
                         ))
                         db.session.commit()
                         flash(f"Successfully summoned {d['name']} token!", "success")
@@ -1873,7 +1911,7 @@ def add_token():
 
 @app.route('/tokens/update_quantity/<int:id>/<action>')
 def update_token_quantity(id, action):
-    token = Token.query.get_or_404(id)
+    token = scoped(Token).filter_by(id=id).first_or_404()
     if action == 'add':
         token.quantity += 1
     elif action == 'sub' and token.quantity > 0:
@@ -1883,7 +1921,7 @@ def update_token_quantity(id, action):
 
 @app.route('/tokens/delete/<int:id>')
 def delete_token(id):
-    token = Token.query.get_or_404(id)
+    token = scoped(Token).filter_by(id=id).first_or_404()
     name = token.name
     db.session.delete(token)
     db.session.commit()
@@ -1920,7 +1958,7 @@ def get_art_card_price_with_fallback(d):
 
 @app.route('/art_cards')
 def list_art_cards():
-    art_cards = ArtCard.query.order_by(ArtCard.id.desc()).all()
+    art_cards = scoped(ArtCard).order_by(ArtCard.id.desc()).all()
     total_value = sum((ac.price or 0.0) * ac.quantity for ac in art_cards)
     return render_template('art_cards.html', art_cards=art_cards, total_value=total_value)
 
@@ -1954,7 +1992,8 @@ def add_art_card():
                     existing_art = ArtCard.query.filter_by(
                         name=d['name'], 
                         set_code=d['set'].upper(), 
-                        collector_number=d['collector_number']
+                        collector_number=d['collector_number'],
+                        user_id=session.get('user_id')
                     ).first()
                     
                     image_url = d.get('image_uris', {}).get('normal') or d.get('image_uris', {}).get('large')
@@ -1976,7 +2015,8 @@ def add_art_card():
                             type_line=d.get('type_line', 'Art Card'),
                             image_url=image_url,
                             quantity=1,
-                            price=price
+                            price=price,
+                            user_id=session.get('user_id')
                         ))
                         db.session.commit()
                         record_snapshot()
@@ -2006,7 +2046,8 @@ def add_art_card():
                     existing_art = ArtCard.query.filter_by(
                         name=d['name'], 
                         set_code=d['set'].upper(), 
-                        collector_number=d['collector_number']
+                        collector_number=d['collector_number'],
+                        user_id=session.get('user_id')
                     ).first()
                     
                     image_url = d.get('image_uris', {}).get('normal') or d.get('image_uris', {}).get('large')
@@ -2028,7 +2069,8 @@ def add_art_card():
                             type_line=d.get('type_line', 'Art Card'),
                             image_url=image_url,
                             quantity=1,
-                            price=price
+                            price=price,
+                            user_id=session.get('user_id')
                         ))
                         db.session.commit()
                         record_snapshot()
@@ -2046,7 +2088,7 @@ def add_art_card():
 
 @app.route('/art_cards/update_quantity/<int:id>/<action>')
 def update_art_card_quantity(id, action):
-    art_card = ArtCard.query.get_or_404(id)
+    art_card = scoped(ArtCard).filter_by(id=id).first_or_404()
     if action == 'add':
         art_card.quantity += 1
     elif action == 'sub' and art_card.quantity > 0:
@@ -2057,7 +2099,7 @@ def update_art_card_quantity(id, action):
 
 @app.route('/art_cards/delete/<int:id>')
 def delete_art_card(id):
-    art_card = ArtCard.query.get_or_404(id)
+    art_card = scoped(ArtCard).filter_by(id=id).first_or_404()
     name = art_card.name
     db.session.delete(art_card)
     db.session.commit()
@@ -2138,7 +2180,7 @@ def view_showcase():
     total_value = sum((c.price or 0.0) * c.quantity for c in cards)
     
     # Calculate concentration percentage of total collection value
-    all_cards = Card.query.all()
+    all_cards = scoped(Card).all()
     total_collection_val = sum((c.price or 0.0) * c.quantity for c in all_cards)
     
     concentration = 0.0

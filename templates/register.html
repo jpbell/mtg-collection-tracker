@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unlock the Vault - The Magicvault</title>
+    <title>Create Account - The Magicvault</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -171,7 +171,7 @@
             margin-bottom: 20px;
         }
 
-        .register-link {
+        .login-link {
             display: inline-block;
             margin-top: 20px;
             color: var(--accent-cyan);
@@ -180,7 +180,7 @@
             transition: color 0.3s;
         }
 
-        .register-link:hover {
+        .login-link:hover {
             color: var(--accent-purple-hover);
         }
 
@@ -203,14 +203,20 @@
     </script>
     <div class="login-card">
         <div class="logo">THE MAGICVAULT</div>
-        <div class="subtitle">Enter credentials to unlock your vault</div>
+        <div class="subtitle">
+            {% if is_first_user %}
+                🔮 First-Time Vault Setup
+            {% else %}
+                Create a new vault account
+            {% endif %}
+        </div>
         
         {% if error %}
             <div class="error-message">{{ error }}</div>
         {% endif %}
         
         <form method="POST">
-            <div class="input-group" style="margin-bottom: 20px;">
+            <div class="input-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" autofocus required autocomplete="off">
             </div>
@@ -218,9 +224,22 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <button type="submit">Unlock</button>
+            <div class="input-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required>
+            </div>
+            <button type="submit">
+                {% if is_first_user %}
+                    Initialize Vault
+                {% else %}
+                    Create Account
+                {% endif %}
+            </button>
         </form>
-        <a href="/register" class="register-link">Create a new vault account</a>
+        
+        {% if not is_first_user %}
+            <a href="/login" class="login-link">Already have an account? Unlock here</a>
+        {% endif %}
     </div>
 </body>
 </html>
