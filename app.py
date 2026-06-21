@@ -656,8 +656,9 @@ def refresh_prices():
         flash("No cards in collection to update.", "info")
         return redirect(url_for('dashboard'))
         
-    # Build unique set/collector keys to fetch from Scryfall
+    # Build unique set/collector keys and name queries to fetch from Scryfall
     distinct_keys = set()
+    playable_names = set()
     for card in cards:
         if card.set_code and card.collector_number:
             distinct_keys.add((card.set_code.lower().strip(), str(card.collector_number).lower().strip()))
@@ -665,8 +666,13 @@ def refresh_prices():
     for ac in art_cards:
         if ac.set_code and ac.collector_number:
             distinct_keys.add((ac.set_code.lower().strip(), str(ac.collector_number).lower().strip()))
+        if ac.name:
+            playable_name = ac.name.split(' // ')[0].strip()
+            playable_names.add(playable_name.lower().strip())
             
     identifiers = [{'set': key[0], 'collector_number': key[1]} for key in distinct_keys]
+    for name in playable_names:
+        identifiers.append({'name': name})
     
     # Query Scryfall in chunks of 75 using POST /cards/collection
     scryfall_cards = []
@@ -692,7 +698,14 @@ def refresh_prices():
         s_code = sc.get('set', '').lower().strip()
         coll_num = sc.get('collector_number', '').lower().strip()
         prices = sc.get('prices', {})
-        price_map[(s_code, coll_num)] = prices
+        if s_code and coll_num:
+            price_map[(s_code, coll_num)] = prices
+            
+        c_name = sc.get('name', '').lower().strip()
+        if c_name:
+            price_map[c_name] = prices
+            if ' // ' in c_name:
+                price_map[c_name.split(' // ')[0].strip()] = prices
         
     # Update standard collection card records
     updated_count = 0
@@ -711,17 +724,28 @@ def refresh_prices():
                     
     # Update art card records
     for ac in art_cards:
+        prices = None
         if ac.set_code and ac.collector_number:
             key = (ac.set_code.lower().strip(), str(ac.collector_number).lower().strip())
             prices = price_map.get(key)
-            if prices:
-                new_price_str = prices.get('usd') or prices.get('usd_foil')
-                if new_price_str:
-                    try:
-                        ac.price = float(new_price_str)
-                        updated_count += 1
-                    except ValueError:
-                        pass
+            
+        new_price_str = None
+        if prices:
+            new_price_str = prices.get('usd') or prices.get('usd_foil')
+            
+        # Fallback to the corresponding playable card's price if the art card itself has no price on Scryfall
+        if not new_price_str and ac.name:
+            playable_name = ac.name.split(' // ')[0].strip().lower()
+            playable_prices = price_map.get(playable_name)
+            if playable_prices:
+                new_price_str = playable_prices.get('usd') or playable_prices.get('usd_foil')
+                
+        if new_price_str:
+            try:
+                ac.price = float(new_price_str)
+                updated_count += 1
+            except ValueError:
+                pass
                         
     if updated_count > 0:
         db.session.commit()
@@ -1854,6 +1878,32 @@ def delete_token(id):
     flash(f"Removed {name} token from tracking.", "success")
     return redirect(url_for('list_tokens'))
 
+def get_art_card_price_with_fallback(d):
+    price_str = d.get('prices', {}).get('usd') or d.get('prices', {}).get('usd_foil')
+    if price_str:
+        try:
+            return float(price_str)
+        except ValueError:
+            pass
+    # Fallback to playable card price
+    name = d.get('name', '')
+    if name:
+        playable_name = name.split(' // ')[0].strip()
+        try:
+            res = requests.get(
+                f"https://api.scryfall.com/cards/named?exact={requests.utils.quote(playable_name)}",
+                headers={"User-Agent": "MTGTracker/1.0"},
+                timeout=5
+            )
+            if res.status_code == 200:
+                fallback_data = res.json()
+                fallback_price_str = fallback_data.get('prices', {}).get('usd') or fallback_data.get('prices', {}).get('usd_foil')
+                if fallback_price_str:
+                    return float(fallback_price_str)
+        except Exception as e:
+            print(f"Error fetching fallback price for {playable_name}: {e}")
+    return 0.0
+
 # --- Art Card Tracker Routes ---
 
 @app.route('/art_cards')
@@ -1900,7 +1950,7 @@ def add_art_card():
                         first_face = d['card_faces'][0]
                         image_url = first_face.get('image_uris', {}).get('normal') or first_face.get('image_uris', {}).get('large')
                     
-                    price = float(d.get('prices', {}).get('usd') or d.get('prices', {}).get('usd_foil') or 0.0)
+                    price = get_art_card_price_with_fallback(d)
                     if existing_art:
                         existing_art.quantity += 1
                         db.session.commit()
@@ -1952,7 +2002,7 @@ def add_art_card():
                         first_face = d['card_faces'][0]
                         image_url = first_face.get('image_uris', {}).get('normal') or first_face.get('image_uris', {}).get('large')
                     
-                    price = float(d.get('prices', {}).get('usd') or d.get('prices', {}).get('usd_foil') or 0.0)
+                    price = get_art_card_price_with_fallback(d)
                     if existing_art:
                         existing_art.quantity += 1
                         db.session.commit()
