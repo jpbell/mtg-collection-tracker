@@ -120,6 +120,17 @@ python3 app.py
 ```
 Open your browser and navigate to `http://127.0.0.1:5000` to start managing your library!
 
+### 5. Vault Authentication (Default Passcode)
+To protect your inventory database, the application requires a passcode at login.
+* **Default Passcode**: `magicvault`
+* **Customizing the Passcode**:
+  - **In-App Settings**: Navigate to the **Settings** panel to change your vault passcode.
+  - **Environment Variable**: Set the `APP_PASSWORD` environment variable before running:
+    ```bash
+    export APP_PASSWORD="your_custom_passcode"
+    ```
+  - **Local File Override**: Save your custom passcode directly to a `passcode.txt` text file in the project's root directory (this file is excluded from git and will take precedence).
+
 ---
 
 ## 📁 File Structure
