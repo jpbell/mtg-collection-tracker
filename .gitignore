@@ -24,3 +24,6 @@ price_update_metadata.json
 .vscode/
 .idea/
 .DS_Store
+
+# Local release scripts
+create_release.py
