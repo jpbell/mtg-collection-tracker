@@ -48,6 +48,14 @@ Designed with a sleek, responsive dark glassmorphism user interface and backed b
 
 ![Wishlist Tracker](screenshots/wishlist.png)
 
+### 7. ⚜️ Elite Showcase & Public Sharing
+* **Automated Top 5 Rankings**: Automatically calculates and highlights your top 5 most valuable cards in real-time.
+* **Anonymized Public Sharing**: Publicly accessible page (`/showcase`) that skips security login passcodes to let you share your collection with friends safely.
+* **XP Milestone Bar**: Visual progress bar tracking total value towards collecting targets ($100, $500, etc.).
+* **3D Tilt & Foil Shimmer**: Interactive hover tilt animations and detailed overlay stats modal queried from Scryfall.
+
+![The Elite Showcase](screenshots/showcase.png)
+
 ---
 
 ## 🛠️ Tech Stack
