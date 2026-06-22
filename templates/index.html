@@ -985,8 +985,14 @@
                             {% if card.is_commander_candidate %}
                                 <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Can be your Commander">👑 Commander</span>
                             {% endif %}
+                            {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
+                                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Vintage Card (Pre-Modern)">👑 Vintage</span>
+                            {% elif card.is_modern %}
+                                <span class="badge" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3);" title="Modern Legal">⚡ Modern</span>
+                            {% endif %}
                         </div>
                     </div>
+
                     <div class="card-price">
                         ${{ "%.2f"|format(card.price) }}
                     </div>
