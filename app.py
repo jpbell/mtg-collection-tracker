@@ -77,6 +77,9 @@ class Card(db.Model):
     colors = db.Column(db.String(50), nullable=True)
     is_illegal = db.Column(db.Boolean, default=False, server_default='0')
     condition = db.Column(db.String(50), default='Near Mint', server_default='Near Mint')
+    is_modern = db.Column(db.Boolean, default=True, server_default='1')
+    is_vintage = db.Column(db.Boolean, default=True, server_default='1')
+
 
     @property
     def is_commander_candidate(self):
@@ -186,6 +189,19 @@ def upgrade_database_schema():
                         conn.execute(db.text("ALTER TABLE card ADD COLUMN condition VARCHAR(50) DEFAULT 'Near Mint'"))
                 except Exception as e:
                     print(f"Failed to alter table card to add condition: {e}")
+            if table == 'card' and 'is_modern' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN is_modern BOOLEAN DEFAULT 1"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add is_modern: {e}")
+            if table == 'card' and 'is_vintage' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN is_vintage BOOLEAN DEFAULT 1"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add is_vintage: {e}")
+
 
 with app.app_context():
     upgrade_database_schema()
@@ -287,6 +303,8 @@ def add_card():
                 'alchemy', 'timeless', 'oathbreaker'
             ]
             is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
+            is_modern = (legalities.get('modern') in ['legal', 'restricted'])
+            is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
             
             db.session.add(Card(name=d['name'], set_code=set_code, 
                                 collector_number=collector_number, 
@@ -300,7 +318,10 @@ def add_card():
                                 colors=colors,
                                 is_illegal=is_illegal,
                                 user_id=session.get('user_id'),
-                                condition=condition))
+                                condition=condition,
+                                is_modern=is_modern,
+                                is_vintage=is_vintage))
+
             db.session.commit()
             record_snapshot()
             flash(f"Successfully summoned {d['name']} ({condition}, {'Foil' if is_foil else 'Non-Foil'}) for ${price:.2f}!", "success")
@@ -1110,6 +1131,8 @@ def claim_wishlist_card(card_id):
                     'alchemy', 'timeless', 'oathbreaker'
                 ]
                 is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
+                is_modern = (legalities.get('modern') in ['legal', 'restricted'])
+                is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
         except Exception:
             pass
             
@@ -1127,8 +1150,11 @@ def claim_wishlist_card(card_id):
             cmc=cmc,
             type_line=type_line,
             is_illegal=is_illegal,
-            user_id=session.get('user_id')
+            user_id=session.get('user_id'),
+            is_modern=is_modern,
+            is_vintage=is_vintage
         )
+
         db.session.add(new_card)
         
     db.session.delete(item)
@@ -1484,7 +1510,9 @@ def add_basic_lands(deck_id):
                     type_line=d.get('type_line', ''),
                     colors=",".join(d.get('colors', [])),
                     is_illegal=False,
-                    user_id=session.get('user_id')
+                    user_id=session.get('user_id'),
+                    is_modern=True,
+                    is_vintage=True
                 )
                 db.session.add(collection_card)
                 db.session.commit()
@@ -1504,8 +1532,11 @@ def add_basic_lands(deck_id):
                     type_line=f'Basic Land — {land_info["name"]}',
                     colors='',
                     is_illegal=False,
-                    user_id=session.get('user_id')
+                    user_id=session.get('user_id'),
+                    is_modern=True,
+                    is_vintage=True
                 )
+
                 db.session.add(collection_card)
                 db.session.commit()
         except Exception:
@@ -1558,6 +1589,8 @@ def backfill_cards():
                     'alchemy', 'timeless', 'oathbreaker'
                 ]
                 card.is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
+                card.is_modern = (legalities.get('modern') in ['legal', 'restricted'])
+                card.is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
                 
                 count += 1
         except Exception:
@@ -1707,6 +1740,8 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
                 'alchemy', 'timeless', 'oathbreaker'
             ]
             is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
+            is_modern = (legalities.get('modern') in ['legal', 'restricted'])
+            is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
 
             db_card = Card(
                 name=sc['name'],
@@ -1721,8 +1756,11 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
                 colors=",".join(sc.get('colors', [])),
                 quantity=needed_qty,
                 is_illegal=is_illegal,
-                user_id=session.get('user_id')
+                user_id=session.get('user_id'),
+                is_modern=is_modern,
+                is_vintage=is_vintage
             )
+
             db.session.add(db_card)
             db.session.flush()
             
@@ -2344,9 +2382,14 @@ def view_showcase(username=None):
             if not user:
                 return "No user showcases available.", 404
     
-    cards = Card.query.filter_by(user_id=user.id).order_by(Card.price.desc()).limit(10).all()
-    total_qty = sum(c.quantity for c in cards)
-    total_value = sum((c.price or 0.0) * c.quantity for c in cards)
+    vintage_cards = Card.query.filter_by(user_id=user.id, is_vintage=True).order_by(Card.price.desc()).limit(5).all()
+    vintage_ids = [c.id for c in vintage_cards]
+    
+    modern_cards = Card.query.filter_by(user_id=user.id, is_modern=True).filter(~Card.id.in_(vintage_ids) if vintage_ids else True).order_by(Card.price.desc()).limit(10).all()
+    
+    showcase_cards = list(vintage_cards) + list(modern_cards)
+    total_qty = sum(c.quantity for c in showcase_cards)
+    total_value = sum((c.price or 0.0) * c.quantity for c in showcase_cards)
     
     # Calculate concentration percentage of total collection value
     all_cards = Card.query.filter_by(user_id=user.id).all()
@@ -2357,10 +2400,12 @@ def view_showcase(username=None):
         concentration = (total_value / total_collection_val) * 100
         
     return render_template('showcase.html', 
-                           cards=cards, 
+                           vintage_cards=vintage_cards,
+                           modern_cards=modern_cards,
                            total_value=total_value, 
                            total_qty=total_qty, 
                            concentration=concentration,
                            showcase_user=user)
+
 
 if __name__ == '__main__': app.run(host='0.0.0.0', debug=True)

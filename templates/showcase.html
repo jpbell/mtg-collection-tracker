@@ -1,19 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Top 10 Cards Showcase - The Magicvault{% endblock %}
+{% block title %}Elite Showcase - The Magicvault{% endblock %}
 
 {% block extra_head %}
     <!-- OpenGraph Rich Embed Previews -->
     <meta property="og:title" content="{{ showcase_user.username }}'s Magicvault Elite Showcase">
-    <meta property="og:description" content="Check out the top 10 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of their library)">
+    <meta property="og:description" content="Check out the top MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}! (Represents {{ '%.1f'|format(concentration) }}% of their library)">
     <meta property="og:type" content="website">
-    {% if cards and cards[0].image_url %}
-        <meta property="og:image" content="{{ cards[0].image_url }}">
+    {% if vintage_cards and vintage_cards[0].image_url %}
+        <meta property="og:image" content="{{ vintage_cards[0].image_url }}">
+    {% elif modern_cards and modern_cards[0].image_url %}
+        <meta property="og:image" content="{{ modern_cards[0].image_url }}">
     {% endif %}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ showcase_user.username }}'s Magicvault Elite Showcase">
-    <meta name="twitter:description" content="Check out the top 10 most valuable MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}!">
+    <meta name="twitter:description" content="Check out the top MTG cards in {{ showcase_user.username }}'s collection, valued at ${{ '%.2f'|format(total_value) }}!">
 {% endblock %}
+
 
 {% block content %}
 <style>
@@ -42,6 +45,25 @@
         margin: 0 auto 20px auto;
         line-height: 1.6;
     }
+
+    .showcase-section-title {
+        font-family: 'Cinzel', serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-top: 50px;
+        margin-bottom: 20px;
+        letter-spacing: 1px;
+        background: linear-gradient(135deg, var(--text-main) 0%, var(--accent-cyan) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        border-bottom: 1px solid var(--panel-border);
+        padding-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: fadeInUp 0.5s ease;
+    }
+
 
     /* Milestone XP Progress Bar */
     .showcase-milestone-container {
@@ -563,7 +585,7 @@
 <div class="showcase-header">
     <h1 class="showcase-title">⚜️ {{ showcase_user.username }}'s Elite Showcase ⚜️</h1>
     <p class="showcase-subtitle">
-        A real-time public showcase of the top 10 most valuable Magic: The Gathering cards in {{ showcase_user.username }}'s personal collection. 
+        A real-time public showcase of the top 5 Vintage cards and the top 10 Modern cards in {{ showcase_user.username }}'s personal collection. 
         As new cards are summoned, this collection dynamically updates to reflect the highest tier items.
     </p>
     <div style="display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 16px;">
@@ -573,7 +595,7 @@
     </div>
 </div>
 
-{% if cards %}
+{% if vintage_cards or modern_cards %}
     <!-- Milestone progress bar calculator -->
     {% set val = total_value or 0.0 %}
     {% if val < 100 %}
@@ -615,97 +637,200 @@
             <span class="showcase-stat-label">Total Qty</span>
             <span class="showcase-stat-value">{{ total_qty }} Cards</span>
         </div>
-        <div class="showcase-stat-card" title="Percentage of total library value held by these 10 cards">
+        <div class="showcase-stat-card" title="Percentage of total library value held by these showcase cards">
             <span class="showcase-stat-label">Concentration</span>
             <span class="showcase-stat-value" style="color: var(--accent-purple); text-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.3);">{{ "%.1f"|format(concentration) }}%</span>
         </div>
     </div>
 
-    <div class="showcase-grid">
-        {% for card in cards %}
-            {# Determine card color identity class #}
-            {% set color_list = card.colors.split(',') if card.colors else [] %}
-            {% set color_count = color_list|length %}
-            {% if color_count == 0 %}
-                {% set theme_class = 'theme-colorless' %}
-            {% elif color_count > 1 %}
-                {% set theme_class = 'theme-multicolor' %}
-            {% else %}
-                {% if color_list[0]|lower == 'w' %}{% set theme_class = 'theme-white' %}
-                {% elif color_list[0]|lower == 'u' %}{% set theme_class = 'theme-blue' %}
-                {% elif color_list[0]|lower == 'b' %}{% set theme_class = 'theme-black' %}
-                {% elif color_list[0]|lower == 'r' %}{% set theme_class = 'theme-red' %}
-                {% elif color_list[0]|lower == 'g' %}{% set theme_class = 'theme-green' %}
-                {% else %}{% set theme_class = 'theme-colorless' %}{% endif %}
-            {% endif %}
+    <!-- Vintage Cards Section -->
+    <h2 class="showcase-section-title">👑 Top 5 Vintage Cards</h2>
+    {% if vintage_cards %}
+        <div class="showcase-grid">
+            {% for card in vintage_cards %}
+                {# Determine card color identity class #}
+                {% set color_list = card.colors.split(',') if card.colors else [] %}
+                {% set color_count = color_list|length %}
+                {% if color_count == 0 %}
+                    {% set theme_class = 'theme-colorless' %}
+                {% elif color_count > 1 %}
+                    {% set theme_class = 'theme-multicolor' %}
+                {% else %}
+                    {% if color_list[0]|lower == 'w' %}{% set theme_class = 'theme-white' %}
+                    {% elif color_list[0]|lower == 'u' %}{% set theme_class = 'theme-blue' %}
+                    {% elif color_list[0]|lower == 'b' %}{% set theme_class = 'theme-black' %}
+                    {% elif color_list[0]|lower == 'r' %}{% set theme_class = 'theme-red' %}
+                    {% elif color_list[0]|lower == 'g' %}{% set theme_class = 'theme-green' %}
+                    {% else %}{% set theme_class = 'theme-colorless' %}{% endif %}
+                {% endif %}
 
-            <div class="showcase-card-wrapper" style="animation-delay: {{ loop.index0 * 100 }}ms;">
-                <div class="showcase-card {{ theme_class }} {% if card.is_foil %}is-foil{% endif %}" 
-                     style="cursor: pointer;"
-                     data-name="{{ card.name }}"
-                     data-set="{{ card.set_code|upper }}"
-                     data-number="{{ card.collector_number or '' }}"
-                     data-rarity="{{ card.rarity or 'Unknown' }}"
-                     data-price="{{ '%.2f'|format(card.price or 0.0) }}"
-                     data-is-foil="{{ card.is_foil|int }}"
-                     data-mana-cost="{{ card.mana_cost or '' }}"
-                     data-cmc="{{ card.cmc or 0 }}"
-                     data-type-line="{{ card.type_line or '' }}"
-                     data-colors="{{ card.colors or '' }}"
-                     data-is-illegal="{{ card.is_illegal|int }}"
-                     data-image="{{ card.image_url or '' }}"
-                     data-is-commander="{{ card.is_commander_candidate|int }}">
-                    
-                    <!-- Rank Badge -->
-                    <div class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}normal{% endif %}" title="Rank #{{ loop.index }}">
-                        {{ loop.index }}
-                    </div>
-                    
-                    <div class="showcase-image-wrapper">
-                        {% if card.is_foil %}
-                            <div class="foil-sheen-overlay"></div>
-                        {% endif %}
-                        {% if card.image_url %}
-                            <img src="{{ card.image_url }}" alt="{{ card.name }}" class="showcase-image" loading="lazy">
-                        {% else %}
-                            <div class="showcase-card-placeholder">
-                                <div>{{ card.name }}</div>
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="showcase-info">
-                        <h3 class="showcase-card-title" title="{{ card.name }}">{{ card.name }}</h3>
+                <div class="showcase-card-wrapper" style="animation-delay: {{ loop.index0 * 100 }}ms;">
+                    <div class="showcase-card {{ theme_class }} {% if card.is_foil %}is-foil{% endif %}" 
+                         style="cursor: pointer;"
+                         data-name="{{ card.name }}"
+                         data-set="{{ card.set_code|upper }}"
+                         data-number="{{ card.collector_number or '' }}"
+                         data-rarity="{{ card.rarity or 'Unknown' }}"
+                         data-price="{{ '%.2f'|format(card.price or 0.0) }}"
+                         data-is-foil="{{ card.is_foil|int }}"
+                         data-mana-cost="{{ card.mana_cost or '' }}"
+                         data-cmc="{{ card.cmc or 0 }}"
+                         data-type-line="{{ card.type_line or '' }}"
+                         data-colors="{{ card.colors or '' }}"
+                         data-is-illegal="{{ card.is_illegal|int }}"
+                         data-image="{{ card.image_url or '' }}"
+                         data-is-commander="{{ card.is_commander_candidate|int }}">
                         
-                        <div class="showcase-card-meta">
-                            <span>{{ card.set_code|upper }} #{{ card.collector_number or '?' }}</span>
-                            <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600;">Qty: {{ card.quantity }}</span>
+                        <!-- Rank Badge -->
+                        <div class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}normal{% endif %}" title="Rank #{{ loop.index }}">
+                            {{ loop.index }}
                         </div>
-
-                        <div class="showcase-badges">
-                            {% if card.rarity %}
-                                <span class="badge badge-{{ card.rarity|lower }}">{{ card.rarity }}</span>
-                            {% endif %}
+                        
+                        <div class="showcase-image-wrapper">
                             {% if card.is_foil %}
-                                <span class="badge foil-badge" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(168, 85, 247, 0.15)); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">Foil</span>
+                                <div class="foil-sheen-overlay"></div>
                             {% endif %}
-                            {% if card.is_commander_candidate %}
-                                <span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25);">👑 Commander</span>
-                            {% endif %}
-                            {% if card.is_illegal %}
-                                <span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.25);" title="This card is banned or illegal in formats like Standard or Commander">🚨 Banned / Illegal</span>
+                            {% if card.image_url %}
+                                <img src="{{ card.image_url }}" alt="{{ card.name }}" class="showcase-image" loading="lazy">
+                            {% else %}
+                                <div class="showcase-card-placeholder">
+                                    <div>{{ card.name }}</div>
+                                </div>
                             {% endif %}
                         </div>
 
-                        <div class="showcase-price-row">
-                            <span class="showcase-price-label">Value</span>
-                            <span class="showcase-price-value">${{ "%.2f"|format(card.price or 0.0) }}</span>
+                        <div class="showcase-info">
+                            <h3 class="showcase-card-title" title="{{ card.name }}">{{ card.name }}</h3>
+                            
+                            <div class="showcase-card-meta">
+                                <span>{{ card.set_code|upper }} #{{ card.collector_number or '?' }}</span>
+                                <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600;">Qty: {{ card.quantity }}</span>
+                            </div>
+
+                            <div class="showcase-badges">
+                                {% if card.rarity %}
+                                    <span class="badge badge-{{ card.rarity|lower }}">{{ card.rarity }}</span>
+                                {% endif %}
+                                {% if card.is_foil %}
+                                    <span class="badge foil-badge" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(168, 85, 247, 0.15)); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">Foil</span>
+                                {% endif %}
+                                {% if card.is_commander_candidate %}
+                                    <span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25);">👑 Commander</span>
+                                {% endif %}
+                                {% if card.is_illegal %}
+                                    <span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.25);" title="This card is banned or illegal in formats like Standard or Commander">🚨 Banned / Illegal</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="showcase-price-row">
+                                <span class="showcase-price-label">Value</span>
+                                <span class="showcase-price-value">${{ "%.2f"|format(card.price or 0.0) }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        {% endfor %}
-    </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 30px; border: 1px dashed var(--panel-border); border-radius: 12px; background: rgba(255,255,255,0.01); margin-bottom: 30px;">
+            <p style="color: var(--text-muted); margin: 0;">No Vintage-legal cards in this collection.</p>
+        </div>
+    {% endif %}
+
+    <!-- Modern Cards Section -->
+    <h2 class="showcase-section-title">⚡ Top 10 Modern Cards</h2>
+    {% if modern_cards %}
+        <div class="showcase-grid">
+            {% for card in modern_cards %}
+                {# Determine card color identity class #}
+                {% set color_list = card.colors.split(',') if card.colors else [] %}
+                {% set color_count = color_list|length %}
+                {% if color_count == 0 %}
+                    {% set theme_class = 'theme-colorless' %}
+                {% elif color_count > 1 %}
+                    {% set theme_class = 'theme-multicolor' %}
+                {% else %}
+                    {% if color_list[0]|lower == 'w' %}{% set theme_class = 'theme-white' %}
+                    {% elif color_list[0]|lower == 'u' %}{% set theme_class = 'theme-blue' %}
+                    {% elif color_list[0]|lower == 'b' %}{% set theme_class = 'theme-black' %}
+                    {% elif color_list[0]|lower == 'r' %}{% set theme_class = 'theme-red' %}
+                    {% elif color_list[0]|lower == 'g' %}{% set theme_class = 'theme-green' %}
+                    {% else %}{% set theme_class = 'theme-colorless' %}{% endif %}
+                {% endif %}
+
+                <div class="showcase-card-wrapper" style="animation-delay: {{ loop.index0 * 100 }}ms;">
+                    <div class="showcase-card {{ theme_class }} {% if card.is_foil %}is-foil{% endif %}" 
+                         style="cursor: pointer;"
+                         data-name="{{ card.name }}"
+                         data-set="{{ card.set_code|upper }}"
+                         data-number="{{ card.collector_number or '' }}"
+                         data-rarity="{{ card.rarity or 'Unknown' }}"
+                         data-price="{{ '%.2f'|format(card.price or 0.0) }}"
+                         data-is-foil="{{ card.is_foil|int }}"
+                         data-mana-cost="{{ card.mana_cost or '' }}"
+                         data-cmc="{{ card.cmc or 0 }}"
+                         data-type-line="{{ card.type_line or '' }}"
+                         data-colors="{{ card.colors or '' }}"
+                         data-is-illegal="{{ card.is_illegal|int }}"
+                         data-image="{{ card.image_url or '' }}"
+                         data-is-commander="{{ card.is_commander_candidate|int }}">
+                        
+                        <!-- Rank Badge -->
+                        <div class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}normal{% endif %}" title="Rank #{{ loop.index }}">
+                            {{ loop.index }}
+                        </div>
+                        
+                        <div class="showcase-image-wrapper">
+                            {% if card.is_foil %}
+                                <div class="foil-sheen-overlay"></div>
+                            {% endif %}
+                            {% if card.image_url %}
+                                <img src="{{ card.image_url }}" alt="{{ card.name }}" class="showcase-image" loading="lazy">
+                            {% else %}
+                                <div class="showcase-card-placeholder">
+                                    <div>{{ card.name }}</div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="showcase-info">
+                            <h3 class="showcase-card-title" title="{{ card.name }}">{{ card.name }}</h3>
+                            
+                            <div class="showcase-card-meta">
+                                <span>{{ card.set_code|upper }} #{{ card.collector_number or '?' }}</span>
+                                <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600;">Qty: {{ card.quantity }}</span>
+                            </div>
+
+                            <div class="showcase-badges">
+                                {% if card.rarity %}
+                                    <span class="badge badge-{{ card.rarity|lower }}">{{ card.rarity }}</span>
+                                {% endif %}
+                                {% if card.is_foil %}
+                                    <span class="badge foil-badge" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(168, 85, 247, 0.15)); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">Foil</span>
+                                {% endif %}
+                                {% if card.is_commander_candidate %}
+                                    <span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25);">👑 Commander</span>
+                                {% endif %}
+                                {% if card.is_illegal %}
+                                    <span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.25);" title="This card is banned or illegal in formats like Standard or Commander">🚨 Banned / Illegal</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="showcase-price-row">
+                                <span class="showcase-price-label">Value</span>
+                                <span class="showcase-price-value">${{ "%.2f"|format(card.price or 0.0) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 30px; border: 1px dashed var(--panel-border); border-radius: 12px; background: rgba(255,255,255,0.01);">
+            <p style="color: var(--text-muted); margin: 0;">No Modern-legal cards in this collection.</p>
+        </div>
+    {% endif %}
+
 {% else %}
     <div style="text-align: center; padding: 60px 20px; border: 1px dashed var(--panel-border); border-radius: 16px; background: rgba(255,255,255,0.01);">
         <div style="font-size: 3rem; margin-bottom: 16px;">🔮</div>
@@ -715,6 +840,7 @@
         </p>
     </div>
 {% endif %}
+
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
