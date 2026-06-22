@@ -1276,9 +1276,11 @@ def view_deck(deck_id):
     available_cards = []
     
     for c in all_collection_cards:
-        dc = DeckCard.query.filter_by(deck_id=deck_id, card_id=c.id).first()
-        current_deck_qty = dc.quantity if dc else 0
-        remaining_qty = max(0, c.quantity - current_deck_qty)
+        total_in_decks = db.session.query(func.sum(DeckCard.quantity))\
+            .join(Deck)\
+            .filter(Deck.user_id == session.get('user_id'), DeckCard.card_id == c.id)\
+            .scalar() or 0
+        remaining_qty = max(0, c.quantity - total_in_decks)
         available_cards.append({
             'card': c,
             'remaining_qty': remaining_qty
@@ -1400,8 +1402,12 @@ def add_to_deck(deck_id):
     current_deck_qty = existing_deck_card.quantity if existing_deck_card else 0
     new_deck_qty = current_deck_qty + quantity
     
-    # Check against unassigned owned copies
-    available_qty = collection_card.quantity - current_deck_qty
+    # Check against unassigned owned copies (across all decks)
+    total_in_decks = db.session.query(func.sum(DeckCard.quantity))\
+        .join(Deck)\
+        .filter(Deck.user_id == session.get('user_id'), DeckCard.card_id == card_id)\
+        .scalar() or 0
+    available_qty = max(0, collection_card.quantity - total_in_decks)
     if quantity > available_qty:
         flash(f"Cannot add {quantity} copies. You only have {available_qty} unassigned copies in your collection.", "error")
         return redirect(url_for('view_deck', deck_id=deck_id))
@@ -1438,9 +1444,13 @@ def update_deck_card_quantity(deck_id, deck_card_id, action):
     collection_card = dc.card
     
     if action == 'add':
-        # Check collection quantity limit
-        if dc.quantity >= collection_card.quantity:
-            flash(f"Cannot add more. You only own {collection_card.quantity} copies of {collection_card.name}.", "error")
+        # Check collection quantity limit (across all decks)
+        total_in_decks = db.session.query(func.sum(DeckCard.quantity))\
+            .join(Deck)\
+            .filter(Deck.user_id == session.get('user_id'), DeckCard.card_id == collection_card.id)\
+            .scalar() or 0
+        if total_in_decks >= collection_card.quantity:
+            flash(f"Cannot add more. You only own {collection_card.quantity} copies of {collection_card.name} and all are allocated to decks.", "error")
             return redirect(url_for('view_deck', deck_id=deck_id))
             
         # Check format quantity limit
