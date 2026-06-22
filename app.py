@@ -1278,12 +1278,11 @@ def view_deck(deck_id):
     for c in all_collection_cards:
         dc = DeckCard.query.filter_by(deck_id=deck_id, card_id=c.id).first()
         current_deck_qty = dc.quantity if dc else 0
-        remaining_qty = c.quantity - current_deck_qty
-        if remaining_qty > 0:
-            available_cards.append({
-                'card': c,
-                'remaining_qty': remaining_qty
-            })
+        remaining_qty = max(0, c.quantity - current_deck_qty)
+        available_cards.append({
+            'card': c,
+            'remaining_qty': remaining_qty
+        })
             
     # Calculate deck analytics
     cmc_distribution = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, '7+': 0}

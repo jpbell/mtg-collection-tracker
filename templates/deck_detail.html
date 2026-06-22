@@ -351,6 +351,12 @@
             gap: 16px;
         }
     }
+    
+    select option:disabled {
+        color: rgba(255, 255, 255, 0.3) !important;
+        background-color: rgba(11, 9, 20, 0.8) !important;
+        font-style: italic;
+    }
 </style>
 
 <div class="deck-header">
@@ -537,7 +543,8 @@
                                 data-qty="{{ entry.remaining_qty }}"
                                 data-cmc="{{ entry.card.cmc or 0 }}"
                                 data-color="{% if not entry.card.colors %}colorless c{% else %}{{ entry.card.colors|lower }}{% endif %} {% if entry.card.colors %}{% if 'w' in entry.card.colors|lower %}white{% endif %} {% if 'u' in entry.card.colors|lower %}blue{% endif %} {% if 'b' in entry.card.colors|lower %}black{% endif %} {% if 'r' in entry.card.colors|lower %}red{% endif %} {% if 'g' in entry.card.colors|lower %}green{% endif %}{% endif %}"
-                                data-type="{{ entry.card.type_line|lower or '' }}">
+                                data-type="{{ entry.card.type_line|lower or '' }}"
+                                {% if entry.remaining_qty <= 0 %}disabled{% endif %}>
                             {{ entry.card.name }} 
                             {% if entry.card.is_foil %}[FOIL]{% endif %} 
                             {% if entry.card.is_commander_candidate %}[👑 COMMANDER]{% endif %}
@@ -900,15 +907,15 @@
 
             // Filter options
             let filtered = masterOptions.filter(opt => {
-                return opt.disabled || 
-                       opt.text.toLowerCase().includes(query) || 
+                if (opt.disabled && !opt.value) return true;
+                return opt.text.toLowerCase().includes(query) || 
                        opt.color.includes(query) || 
                        opt.type.includes(query);
             });
 
             // Separate placeholder from active options
-            let placeholderOpt = filtered.find(opt => opt.disabled);
-            let activeOpts = filtered.filter(opt => !opt.disabled);
+            let placeholderOpt = filtered.find(opt => opt.disabled && !opt.value);
+            let activeOpts = filtered.filter(opt => !opt.disabled || opt.value);
 
             // Sort active options
             if (sortVal === 'name_asc') {
@@ -951,6 +958,7 @@
                 newOpt.setAttribute('data-qty', opt.qty);
                 newOpt.setAttribute('data-cmc', opt.cmc);
                 if (opt.selected) newOpt.selected = true;
+                if (opt.disabled) newOpt.disabled = true;
                 select.appendChild(newOpt);
             });
         }
