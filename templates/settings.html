@@ -137,6 +137,38 @@
             </div>
         </form>
     </div>
+
+    <!-- Card 3: Database Backup & Import -->
+    <div class="settings-card" style="min-height: 380px;">
+        <div style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h3 class="settings-card-title">
+                    <span>💾</span> Database Management
+                </h3>
+                <p class="settings-card-desc">
+                    Back up your Magicvault catalog or restore it from an existing SQLite backup file.
+                </p>
+                
+                <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px;">
+                    <a href="/settings/backup_db" class="btn" style="text-align: center; text-decoration: none; font-weight: 700; width: 100%; box-sizing: border-box; background: var(--accent-purple); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 10px;">
+                        <span>📥</span> Download Backup
+                    </a>
+                </div>
+
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 24px; padding-top: 20px;">
+                    <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">Restore from Backup</label>
+                    <form action="/settings/import_db" method="POST" enctype="multipart/form-data" id="importDbForm">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <input type="file" name="db_file" accept=".db" required style="background: rgba(255,255,255,0.03); border: 1px dashed var(--panel-border); padding: 12px; border-radius: 8px; cursor: pointer; color: var(--text-muted); font-size: 0.85rem; width: 100%; box-sizing: border-box;">
+                        </div>
+                        <button type="submit" class="btn btn-secondary" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; border-radius: 8px; padding: 10px; box-sizing: border-box;" onclick="return confirm('WARNING: Importing a backup will completely overwrite your current database. This action cannot be undone. Are you sure you want to proceed?');">
+                            <span>📤</span> Restore Database File
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>

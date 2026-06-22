@@ -2438,6 +2438,81 @@ def view_settings():
         
     return render_template('settings.html')
 
+@app.route('/settings/backup_db')
+def backup_db():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+        
+    from flask import send_file
+    db_path = os.path.join(basedir, 'mtg_collection.db')
+    if not os.path.exists(db_path):
+        flash("Database file not found.", "error")
+        return redirect(url_for('view_settings'))
+        
+    return send_file(db_path, as_attachment=True, download_name='mtg_collection_backup.db')
+
+@app.route('/settings/import_db', methods=['POST'])
+def import_db():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+        
+    if 'db_file' not in request.files:
+        flash('No file selected.', 'error')
+        return redirect(url_for('view_settings'))
+        
+    file = request.files['db_file']
+    if file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('view_settings'))
+        
+    if file:
+        import sqlite3
+        import shutil
+        
+        temp_path = os.path.join(basedir, 'temp_import.db')
+        file.save(temp_path)
+        
+        try:
+            conn = sqlite3.connect(temp_path)
+            cursor = conn.cursor()
+            
+            tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            required_tables = ['user', 'card', 'deck', 'deck_card']
+            
+            missing_tables = [t for t in required_tables if t not in tables]
+            if missing_tables:
+                conn.close()
+                os.remove(temp_path)
+                flash(f"Invalid database backup. Missing required tables: {', '.join(missing_tables)}", "error")
+                return redirect(url_for('view_settings'))
+                
+            conn.close()
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f"Failed to validate database backup: {str(e)}", "error")
+            return redirect(url_for('view_settings'))
+            
+        db_path = os.path.join(basedir, 'mtg_collection.db')
+        try:
+            db.session.remove()
+            db.engine.dispose()
+            
+            shutil.copy2(temp_path, db_path)
+            os.remove(temp_path)
+            
+            session.clear()
+            flash("Database restored successfully! Please log in again.", "success")
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f"Failed to restore database: {str(e)}", "error")
+            return redirect(url_for('view_settings'))
+            
+    return redirect(url_for('view_settings'))
+
 @app.route('/showcase')
 @app.route('/showcase/<username>')
 def view_showcase(username=None):
