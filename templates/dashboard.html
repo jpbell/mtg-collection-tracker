@@ -197,6 +197,27 @@
         margin-left: 4px;
         vertical-align: middle;
     }
+
+    /* Custom Scrollbar for scrollable panels */
+    .scrollable-panel {
+        max-height: 260px;
+        overflow-y: auto;
+        padding-right: 6px;
+    }
+    .scrollable-panel::-webkit-scrollbar {
+        width: 6px;
+    }
+    .scrollable-panel::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 4px;
+    }
+    .scrollable-panel::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+    .scrollable-panel::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-purple);
+    }
 </style>
 
 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 2px solid rgba(var(--accent-purple-rgb), 0.2); padding-bottom: 12px; gap: 15px;">
@@ -356,7 +377,7 @@
         <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
             <canvas id="setChart"></canvas>
         </div>
-        <div class="set-list" style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+        <div class="set-list scrollable-panel" style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
             {% for s in set_stats %}
                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -376,7 +397,7 @@
 <!-- Set Completion & Missing Cards Section -->
 <div class="chart-panel" style="margin-bottom: 30px; width: 100%;">
     <h3>Set Completion & Missing Cards Tracker</h3>
-    <div style="margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+    <div class="scrollable-panel" style="max-height: 350px; margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
         {% for s in set_completion %}
             <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
