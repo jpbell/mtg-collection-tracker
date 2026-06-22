@@ -350,6 +350,54 @@ def update_quantity(id, action):
     record_snapshot()
     return redirect(url_for('index'))
 
+@app.route('/update_condition/<int:id>', methods=['POST'])
+def update_condition(id):
+    card = scoped(Card).filter_by(id=id).first_or_404()
+    new_condition = request.form.get('condition', 'Near Mint').strip()
+    
+    valid_conditions = ['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged']
+    if new_condition not in valid_conditions:
+        flash("Invalid card condition selected.", "error")
+        return redirect(url_for('card_detail', id=id))
+        
+    if card.condition != new_condition:
+        old_multiplier = get_condition_multiplier(card.condition)
+        new_multiplier = get_condition_multiplier(new_condition)
+        if old_multiplier > 0:
+            card.price = (card.price / old_multiplier) * new_multiplier
+            
+        matching_card = scoped(Card).filter_by(
+            set_code=card.set_code,
+            collector_number=card.collector_number,
+            is_foil=card.is_foil,
+            condition=new_condition
+        ).filter(Card.id != card.id).first()
+        
+        if matching_card:
+            matching_card.quantity += card.quantity
+            
+            deck_cards = DeckCard.query.filter_by(card_id=card.id).all()
+            for dc in deck_cards:
+                dup_dc = DeckCard.query.filter_by(deck_id=dc.deck_id, card_id=matching_card.id).first()
+                if dup_dc:
+                    dup_dc.quantity += dc.quantity
+                    db.session.delete(dc)
+                else:
+                    dc.card_id = matching_card.id
+                    
+            db.session.delete(card)
+            db.session.commit()
+            record_snapshot()
+            flash(f"Merged copies with existing {new_condition} card.", "success")
+            return redirect(url_for('card_detail', id=matching_card.id))
+        else:
+            card.condition = new_condition
+            db.session.commit()
+            record_snapshot()
+            flash(f"Successfully updated condition to {new_condition}.", "success")
+            
+    return redirect(url_for('card_detail', id=id))
+
 @app.route('/delete/<int:id>')
 def delete_card(id):
     card = scoped(Card).filter_by(id=id).first_or_404()

@@ -90,8 +90,18 @@
                 <td style="border: none; padding: 8px 0; font-family: monospace; font-size: 1.1rem;">{{ card.collector_number or '?' }}</td>
             </tr>
             <tr>
-                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Condition</td>
-                <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600;">{{ card.condition or 'Near Mint' }}</td>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600; vertical-align: middle;">Condition</td>
+                <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600; vertical-align: middle;">
+                    <form action="/update_condition/{{ card.id }}" method="POST" style="display: inline-flex; align-items: center; gap: 8px; margin: 0;">
+                        <select name="condition" onchange="this.form.submit()" style="background: rgba(0, 0, 0, 0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 4px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.95rem; font-family: inherit; outline: none; transition: border-color 0.2s, background-color 0.2s;">
+                            <option value="Near Mint" {% if card.condition == 'Near Mint' %}selected{% endif %}>Near Mint</option>
+                            <option value="Lightly Played" {% if card.condition == 'Lightly Played' %}selected{% endif %}>Lightly Played</option>
+                            <option value="Moderately Played" {% if card.condition == 'Moderately Played' %}selected{% endif %}>Moderately Played</option>
+                            <option value="Heavily Played" {% if card.condition == 'Heavily Played' %}selected{% endif %}>Heavily Played</option>
+                            <option value="Damaged" {% if card.condition == 'Damaged' %}selected{% endif %}>Damaged</option>
+                        </select>
+                    </form>
+                </td>
             </tr>
             {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
             <tr>
