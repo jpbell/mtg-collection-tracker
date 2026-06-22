@@ -126,6 +126,31 @@
             letter-spacing: 1px;
         }
 
+        .nav-menu-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-left: 40px;
+            margin-right: auto;
+        }
+
+        .nav-link-item {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .nav-link-item:hover {
+            color: var(--text-main);
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+        }
+        
+        .mobile-only-link {
+            display: none !important;
+        }
+
         .nav-controls-container {
             display: flex;
             align-items: center;
@@ -459,6 +484,14 @@
                 padding: 1rem 1.5rem;
             }
 
+            .nav-menu-links {
+                display: none !important;
+            }
+
+            .mobile-only-link {
+                display: block !important;
+            }
+
             .nav-links-dropdown {
                 right: 1.5rem;
                 left: 1.5rem;
@@ -688,6 +721,15 @@
     <nav>
         <a href="/" class="nav-logo">The Magicvault</a>
         
+        {% if session.get('user_id') %}
+            <div class="nav-menu-links">
+                <a href="/" class="nav-link-item">Collection</a>
+                <a href="/wishlist" class="nav-link-item">Wishlist</a>
+                <a href="/decks" class="nav-link-item">Decks</a>
+                <a href="/dashboard" class="nav-link-item">Dashboard</a>
+            </div>
+        {% endif %}
+        
         <div class="nav-controls-container">
             {% if session.get('user_id') %}
                 <button class="menu-toggle-btn" id="menuToggleBtn" aria-label="Toggle Menu">
@@ -705,13 +747,16 @@
 
         {% if session.get('user_id') %}
             <div class="nav-links-dropdown" id="navLinksDropdown">
-                <a href="/">Collection</a>
-                <a href="/wishlist">Wishlist</a>
-                <a href="/decks">Decks</a>
+                <!-- Mobile only links -->
+                <a href="/" class="mobile-only-link">Collection</a>
+                <a href="/wishlist" class="mobile-only-link">Wishlist</a>
+                <a href="/decks" class="mobile-only-link">Decks</a>
+                <a href="/dashboard" class="mobile-only-link">Dashboard</a>
+                
+                <!-- Universal links -->
                 <a href="/rules">Format Rules</a>
                 <a href="/tokens">Tokens</a>
                 <a href="/art_cards">Art Cards</a>
-                <a href="/dashboard">Dashboard</a>
                 <a href="/guide">Guide</a>
                 <a href="/releases">Release Notes</a>
                 <a href="/settings">Settings</a>
