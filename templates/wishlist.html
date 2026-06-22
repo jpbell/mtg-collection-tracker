@@ -1566,7 +1566,7 @@
             document.getElementById('lgsAddWishType').textContent = 'Foil';
         } else {
             isFoilSelected = false;
-            currentSelectedPrice = priceNormal > 0 ? priceNormal : (priceFoil > 0 ? priceFoil : 0.0);
+            currentSelectedPrice = priceNormal;
             
             lgsMarketPrice.style.boxShadow = '0 0 8px rgba(6, 182, 212, 0.6)';
             lgsMarketPrice.style.borderColor = 'var(--accent-cyan)';
@@ -1679,12 +1679,25 @@
 
     function calculateLgsDeal() {
         const storePrice = parseFloat(lgsStorePrice.value);
-        if (isNaN(storePrice) || currentSelectedPrice === 0) {
+        if (isNaN(storePrice)) {
             lgsCalculatorResult.style.display = 'none';
             return;
         }
         
         lgsCalculatorResult.style.display = 'flex';
+        
+        if (currentSelectedPrice === 0) {
+            lgsPriceDiff.textContent = `$${storePrice.toFixed(2)}`;
+            lgsPriceDiff.style.color = 'var(--text-main)';
+            lgsPercentDiff.textContent = 'No online price data available';
+            
+            lgsDealBadge.textContent = '🔍 No Price Data';
+            lgsDealBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+            lgsDealBadge.style.color = 'var(--text-muted)';
+            lgsDealBadge.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            return;
+        }
+        
         const diff = storePrice - currentSelectedPrice;
         const percent = (diff / currentSelectedPrice) * 100;
         
@@ -1701,7 +1714,7 @@
         
         lgsPercentDiff.textContent = `${diff >= 0 ? '+' : ''}${percent.toFixed(1)}% compared to Scryfall`;
         
-        if (storePrice <= currentSelectedPrice) {
+        if (storePrice < currentSelectedPrice) {
             lgsDealBadge.textContent = '🔥 Good Deal';
             lgsDealBadge.style.background = 'rgba(16, 185, 129, 0.12)';
             lgsDealBadge.style.color = 'var(--accent-green)';
