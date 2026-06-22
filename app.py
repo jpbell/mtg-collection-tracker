@@ -79,6 +79,8 @@ class Card(db.Model):
     condition = db.Column(db.String(50), default='Near Mint', server_default='Near Mint')
     is_modern = db.Column(db.Boolean, default=True, server_default='1')
     is_vintage = db.Column(db.Boolean, default=True, server_default='1')
+    released_at = db.Column(db.String(10), nullable=True)
+
 
 
     @property
@@ -201,6 +203,13 @@ def upgrade_database_schema():
                         conn.execute(db.text("ALTER TABLE card ADD COLUMN is_vintage BOOLEAN DEFAULT 1"))
                 except Exception as e:
                     print(f"Failed to alter table card to add is_vintage: {e}")
+            if table == 'card' and 'released_at' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN released_at VARCHAR(10)"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add released_at: {e}")
+
 
 
 with app.app_context():
@@ -305,6 +314,7 @@ def add_card():
             is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
             is_modern = (legalities.get('modern') in ['legal', 'restricted'])
             is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
+            released_at = d.get('released_at')
             
             db.session.add(Card(name=d['name'], set_code=set_code, 
                                 collector_number=collector_number, 
@@ -320,7 +330,9 @@ def add_card():
                                 user_id=session.get('user_id'),
                                 condition=condition,
                                 is_modern=is_modern,
-                                is_vintage=is_vintage))
+                                is_vintage=is_vintage,
+                                released_at=released_at))
+
 
             db.session.commit()
             record_snapshot()
@@ -1133,6 +1145,7 @@ def claim_wishlist_card(card_id):
                 is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
                 is_modern = (legalities.get('modern') in ['legal', 'restricted'])
                 is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
+                released_at = d.get('released_at')
         except Exception:
             pass
             
@@ -1152,8 +1165,10 @@ def claim_wishlist_card(card_id):
             is_illegal=is_illegal,
             user_id=session.get('user_id'),
             is_modern=is_modern,
-            is_vintage=is_vintage
+            is_vintage=is_vintage,
+            released_at=released_at
         )
+
 
         db.session.add(new_card)
         
@@ -1512,7 +1527,8 @@ def add_basic_lands(deck_id):
                     is_illegal=False,
                     user_id=session.get('user_id'),
                     is_modern=True,
-                    is_vintage=True
+                    is_vintage=True,
+                    released_at=d.get('released_at')
                 )
                 db.session.add(collection_card)
                 db.session.commit()
@@ -1534,8 +1550,10 @@ def add_basic_lands(deck_id):
                     is_illegal=False,
                     user_id=session.get('user_id'),
                     is_modern=True,
-                    is_vintage=True
+                    is_vintage=True,
+                    released_at='1993-08-05'
                 )
+
 
                 db.session.add(collection_card)
                 db.session.commit()
@@ -1591,6 +1609,7 @@ def backfill_cards():
                 card.is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
                 card.is_modern = (legalities.get('modern') in ['legal', 'restricted'])
                 card.is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
+                card.released_at = d.get('released_at')
                 
                 count += 1
         except Exception:
@@ -1742,6 +1761,7 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
             is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
             is_modern = (legalities.get('modern') in ['legal', 'restricted'])
             is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
+            released_at = sc.get('released_at')
 
             db_card = Card(
                 name=sc['name'],
@@ -1758,8 +1778,10 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
                 is_illegal=is_illegal,
                 user_id=session.get('user_id'),
                 is_modern=is_modern,
-                is_vintage=is_vintage
+                is_vintage=is_vintage,
+                released_at=released_at
             )
+
 
             db.session.add(db_card)
             db.session.flush()
@@ -2382,7 +2404,7 @@ def view_showcase(username=None):
             if not user:
                 return "No user showcases available.", 404
     
-    vintage_cards = Card.query.filter_by(user_id=user.id, is_vintage=True, is_modern=False).order_by(Card.price.desc()).limit(5).all()
+    vintage_cards = Card.query.filter(Card.user_id == user.id, Card.is_vintage == True, Card.released_at < '2003-07-28').order_by(Card.price.desc()).limit(5).all()
     vintage_ids = [c.id for c in vintage_cards]
     
     modern_cards = Card.query.filter_by(user_id=user.id, is_modern=True).filter(~Card.id.in_(vintage_ids) if vintage_ids else True).order_by(Card.price.desc()).limit(10).all()
