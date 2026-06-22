@@ -2126,7 +2126,7 @@
             const grid = document.querySelector('.cards-grid');
             if (!grid) return;
             const cards = Array.from(grid.querySelectorAll('.card-item'));
-            const visibleCards = cards.filter(card => card.style.display !== 'none');
+            const visibleCards = cards.filter(card => card.getAttribute('data-matched') === 'true');
             
             if (visibleCards.length === 0) {
                 alert("No cards match your current search/filter to export.");
