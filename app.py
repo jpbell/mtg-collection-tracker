@@ -2382,7 +2382,7 @@ def view_showcase(username=None):
             if not user:
                 return "No user showcases available.", 404
     
-    vintage_cards = Card.query.filter_by(user_id=user.id, is_vintage=True).order_by(Card.price.desc()).limit(5).all()
+    vintage_cards = Card.query.filter_by(user_id=user.id, is_vintage=True, is_modern=False).order_by(Card.price.desc()).limit(5).all()
     vintage_ids = [c.id for c in vintage_cards]
     
     modern_cards = Card.query.filter_by(user_id=user.id, is_modern=True).filter(~Card.id.in_(vintage_ids) if vintage_ids else True).order_by(Card.price.desc()).limit(10).all()
