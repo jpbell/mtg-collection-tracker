@@ -830,7 +830,8 @@ def search_scryfall_prints():
     url = "https://api.scryfall.com/cards/search"
     params = {
         'q': f'"{query}"' if ' ' in query else query,
-        'unique': 'prints'
+        'unique': 'prints',
+        'include_extras': 'true'
     }
     headers = {"User-Agent": "MTGTracker/1.0"}
     try:
