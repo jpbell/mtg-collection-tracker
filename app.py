@@ -823,27 +823,24 @@ def refresh_prices():
 @app.route('/search_scryfall_prints')
 def search_scryfall_prints():
     query = request.args.get('q', '').strip()
+    set_code = request.args.get('set', '').strip().upper()
+    collector_number = request.args.get('num', '').strip().lower()
+    
     if not query:
         return jsonify([])
         
-    # Search Scryfall for printings
-    url = "https://api.scryfall.com/cards/search"
-    params = {
-        'q': f'"{query}"' if ' ' in query else query,
-        'unique': 'prints',
-        'include_extras': 'true'
-    }
     headers = {"User-Agent": "MTGTracker/1.0"}
-    try:
-        res = requests.get(url, params=params, headers=headers, timeout=10)
-        if res.status_code == 200:
-            data = res.json().get('data', [])
-            results = []
-            for item in data[:40]:  # Limit to top 40 prints to keep payload lightweight
+    exact_print = None
+    
+    # 1. If set and num are provided, try to fetch the exact print first
+    if set_code and collector_number:
+        exact_url = f"https://api.scryfall.com/cards/{set_code.lower()}/{collector_number}"
+        try:
+            res = requests.get(exact_url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                item = res.json()
                 image_url = item.get('image_uris', {}).get('normal') or item.get('card_faces', [{}])[0].get('image_uris', {}).get('normal')
                 name = item.get('name', '')
-                set_code = item.get('set', '').upper()
-                collector_number = item.get('collector_number', '')
                 
                 # Fetch owned quantities from local database
                 owned_total = db.session.query(func.sum(Card.quantity)).filter(func.lower(Card.name) == func.lower(name), Card.user_id == session.get('user_id')).scalar() or 0
@@ -863,11 +860,85 @@ def search_scryfall_prints():
                     WishlistCard.user_id == session.get('user_id')
                 ).scalar() or 0
                 
-                results.append({
+                prices = item.get('prices', {})
+                exact_print = {
                     'name': name,
                     'set_code': set_code,
                     'set_name': item.get('set_name'),
                     'collector_number': collector_number,
+                    'rarity': item.get('rarity'),
+                    'price_usd': prices.get('usd') or '0.0',
+                    'price_usd_foil': prices.get('usd_foil') or '0.0',
+                    'image_url': image_url,
+                    'legalities': item.get('legalities', {}),
+                    'released_at': item.get('released_at', ''),
+                    'color_identity': item.get('color_identity', []),
+                    'colors': item.get('colors', []),
+                    'purchase_uris': item.get('purchase_uris', {}),
+                    'owned_total': int(owned_total),
+                    'owned_spec': int(owned_spec),
+                    'wish_total': int(wish_total),
+                    'wish_spec': int(wish_spec)
+                }
+                
+                # Update query to match the exact name of the fetched card to ensure we only get its printings
+                query = name
+        except Exception as e:
+            print("Error fetching exact print from Scryfall:", e)
+            
+    # 2. Search Scryfall for printings
+    url = "https://api.scryfall.com/cards/search"
+    # If we have set and num, search for the exact name using exact search syntax f'!"{query}"'
+    # Otherwise fallback to original syntax
+    if set_code and collector_number:
+        search_q = f'!"{query}"'
+    else:
+        search_q = f'"{query}"' if ' ' in query else query
+        
+    params = {
+        'q': search_q,
+        'unique': 'prints',
+        'include_extras': 'true'
+    }
+    
+    try:
+        res = requests.get(url, params=params, headers=headers, timeout=10)
+        results = []
+        if res.status_code == 200:
+            data = res.json().get('data', [])
+            for item in data[:60]:  # Increase limit to 60 to fetch more prints for lands/common cards
+                image_url = item.get('image_uris', {}).get('normal') or item.get('card_faces', [{}])[0].get('image_uris', {}).get('normal')
+                name = item.get('name', '')
+                curr_set = item.get('set', '').upper()
+                curr_num = item.get('collector_number', '')
+                
+                # Skip duplicate if this is the exact_print we already fetched
+                if exact_print and curr_set == set_code and str(curr_num).lower() == str(collector_number).lower():
+                    continue
+                    
+                # Fetch owned quantities from local database
+                owned_total = db.session.query(func.sum(Card.quantity)).filter(func.lower(Card.name) == func.lower(name), Card.user_id == session.get('user_id')).scalar() or 0
+                owned_spec = db.session.query(func.sum(Card.quantity)).filter(
+                    func.lower(Card.name) == func.lower(name),
+                    func.lower(Card.set_code) == func.lower(curr_set),
+                    func.lower(Card.collector_number) == func.lower(curr_num),
+                    Card.user_id == session.get('user_id')
+                ).scalar() or 0
+                
+                # Fetch wishlist quantities from local database
+                wish_total = db.session.query(func.sum(WishlistCard.quantity)).filter(func.lower(WishlistCard.name) == func.lower(name), WishlistCard.user_id == session.get('user_id')).scalar() or 0
+                wish_spec = db.session.query(func.sum(WishlistCard.quantity)).filter(
+                    func.lower(WishlistCard.name) == func.lower(name),
+                    func.lower(WishlistCard.set_code) == func.lower(curr_set),
+                    func.lower(WishlistCard.collector_number) == func.lower(curr_num),
+                    WishlistCard.user_id == session.get('user_id')
+                ).scalar() or 0
+                
+                results.append({
+                    'name': name,
+                    'set_code': curr_set,
+                    'set_name': item.get('set_name'),
+                    'collector_number': curr_num,
                     'rarity': item.get('rarity'),
                     'price_usd': item.get('prices', {}).get('usd') or '0.0',
                     'price_usd_foil': item.get('prices', {}).get('usd_foil') or '0.0',
@@ -882,9 +953,17 @@ def search_scryfall_prints():
                     'wish_total': int(wish_total),
                     'wish_spec': int(wish_spec)
                 })
-            return jsonify(results)
+                
+        # Prepend exact print if we fetched it
+        if exact_print:
+            results.insert(0, exact_print)
+            
+        return jsonify(results)
     except Exception as e:
         print("Scryfall search error:", e)
+        
+    if exact_print:
+        return jsonify([exact_print])
         
     return jsonify([])
  

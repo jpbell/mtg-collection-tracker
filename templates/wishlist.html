@@ -523,6 +523,7 @@
             <div class="wishlist-item{% if item.is_foil %} is-foil{% endif %}" 
                  data-name="{{ item.name }}" 
                  data-set="{{ item.set_code }}"
+                 data-number="{{ item.collector_number }}"
                  data-foil="{{ 'true' if item.is_foil else 'false' }}"
                  data-price="{{ item.price or 0.0 }}"
                  data-qty="{{ item.quantity or 1 }}">
@@ -1293,13 +1294,14 @@
             
             const cardName = card.getAttribute('data-name');
             const setCode = card.getAttribute('data-set');
+            const collectorNum = card.getAttribute('data-number');
             
             const img = card.querySelector('.wishlist-image');
             if (img) img.style.opacity = '0.5';
             const bodyCursor = document.body.style.cursor;
             document.body.style.cursor = 'wait';
             
-            fetch(`/search_scryfall_prints?q=${encodeURIComponent(cardName)}`)
+            fetch(`/search_scryfall_prints?q=${encodeURIComponent(cardName)}&set=${encodeURIComponent(setCode)}&num=${encodeURIComponent(collectorNum)}`)
                 .then(res => res.json())
                 .then(data => {
                     if (img) img.style.opacity = '';
@@ -1307,7 +1309,11 @@
                     
                     searchResultsData = data;
                     
-                    let targetPrint = data.find(p => p.set_code.toUpperCase() === setCode.toUpperCase());
+                    let targetPrint = data.find(p => p.set_code.toUpperCase() === setCode.toUpperCase() && 
+                                                     p.collector_number.toString().toLowerCase() === collectorNum.toString().toLowerCase());
+                    if (!targetPrint) {
+                        targetPrint = data.find(p => p.set_code.toUpperCase() === setCode.toUpperCase());
+                    }
                     if (!targetPrint) {
                         targetPrint = data[0];
                     }
