@@ -101,6 +101,10 @@ class Card(db.Model):
             return True
         return False
 
+    @property
+    def is_in_deck(self):
+        return db.session.query(db.exists().where(DeckCard.card_id == self.id)).scalar()
+
 class ReleaseNote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     version = db.Column(db.String(20))

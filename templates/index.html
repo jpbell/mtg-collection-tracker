@@ -914,6 +914,18 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Deck Status Filter -->
+            <div class="filter-group">
+                <label>Deck Status</label>
+                <div class="custom-multiselect" id="deckStatusFilter">
+                    <button type="button" class="multiselect-btn" id="deckStatusBtn">All Cards</button>
+                    <div class="multiselect-content" id="deckStatusContent">
+                        <div class="multiselect-option"><input type="checkbox" value="in_deck" id="deckYes"><label for="deckYes">In a Deck</label></div>
+                        <div class="multiselect-option"><input type="checkbox" value="not_in_deck" id="deckNo"><label for="deckNo">Not in a Deck</label></div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; margin-top: 4px;">
@@ -943,7 +955,8 @@
                  data-commander="{{ 'true' if card.is_commander_candidate else 'false' }}"
                  data-illegal="{{ 'true' if card.is_illegal else 'false' }}"
                  data-price="{{ card.price or 0.0 }}"
-                 data-qty="{{ card.quantity or 1 }}">
+                 data-qty="{{ card.quantity or 1 }}"
+                 data-in-deck="{{ 'true' if card.is_in_deck else 'false' }}">
                 <div class="card-image-wrapper">
                     {% if card.image_url %}
                         <img src="{{ card.image_url }}" alt="{{ card.name }}" class="card-image" loading="lazy">
@@ -1170,6 +1183,7 @@
         const selectedTypes = Array.from(document.querySelectorAll('#typeContent input[type="checkbox"]:checked')).map(cb => cb.value);
         const selectedRarities = Array.from(document.querySelectorAll('#rarityContent input[type="checkbox"]:checked')).map(cb => cb.value);
         const selectedFoils = Array.from(document.querySelectorAll('#foilContent input[type="checkbox"]:checked')).map(cb => cb.value);
+        const selectedDecks = Array.from(document.querySelectorAll('#deckStatusContent input[type="checkbox"]:checked')).map(cb => cb.value);
         const filterCommander = document.getElementById('cmdrYes')?.checked || false;
         const filterBannedAll = document.getElementById('cmdrBanned')?.checked || false;
 
@@ -1179,6 +1193,9 @@
         updateBtnText(document.getElementById('typeBtn'), selectedTypes, 'All Types');
         updateBtnText(document.getElementById('rarityBtn'), selectedRarities, 'All Rarities');
         updateBtnText(document.getElementById('foilBtn'), selectedFoils, 'All Finishes');
+        
+        const friendlyDecks = selectedDecks.map(val => val === 'in_deck' ? 'In Deck' : 'Loose');
+        updateBtnText(document.getElementById('deckStatusBtn'), friendlyDecks, 'All Cards');
         
         let legalitySelected = [];
         if (filterCommander) legalitySelected.push('Commander');
@@ -1192,6 +1209,7 @@
         if (selectedTypes.length > 0) activeFilterCount++;
         if (selectedRarities.length > 0) activeFilterCount++;
         if (selectedFoils.length > 0) activeFilterCount++;
+        if (selectedDecks.length > 0) activeFilterCount++;
         if (filterCommander || filterBannedAll) activeFilterCount++;
 
         const badge = document.getElementById('activeFiltersBadge');
@@ -1216,6 +1234,7 @@
             const isFoil = card.getAttribute('data-foil') === 'true';
             const isCommander = card.getAttribute('data-commander') === 'true';
             const isIllegal = card.getAttribute('data-illegal') === 'true';
+            const isInDeck = card.getAttribute('data-in-deck') === 'true';
 
             // 1. Text Search Filter (preserving original syntax checks)
             let matchesText = true;
@@ -1259,6 +1278,10 @@
                         if (isCommander) partMatches = true;
                     } else if (part === 'is:banned' || part === 'is:illegal') {
                         if (isIllegal) partMatches = true;
+                    } else if (part === 'is:deck' || part === 'in:deck') {
+                        if (isInDeck) partMatches = true;
+                    } else if (part === 'is:loose' || part === 'not:deck') {
+                        if (!isInDeck) partMatches = true;
                     } else {
                         if (name.includes(part) || set.includes(part) || rarity.includes(part) || type.includes(part)) partMatches = true;
                     }
@@ -1322,8 +1345,16 @@
             if (filterCommander && !isCommander) matchesLegality = false;
             if (filterBannedAll && !isIllegal) matchesLegality = false;
 
+            // 8. Deck Status Filter
+            let matchesDeck = true;
+            if (selectedDecks.length > 0) {
+                matchesDeck = false;
+                if (selectedDecks.includes('in_deck') && isInDeck) matchesDeck = true;
+                if (selectedDecks.includes('not_in_deck') && !isInDeck) matchesDeck = true;
+            }
+
             // Total evaluation
-            if (matchesText && matchesColor && matchesSet && matchesType && matchesRarity && matchesFoil && matchesLegality) {
+            if (matchesText && matchesColor && matchesSet && matchesType && matchesRarity && matchesFoil && matchesLegality && matchesDeck) {
                 card.setAttribute('data-matched', 'true');
                 visibleCount++;
             } else {
