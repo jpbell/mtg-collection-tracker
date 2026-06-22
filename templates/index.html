@@ -845,6 +845,10 @@
                         <div class="multiselect-option"><input type="checkbox" value="g" id="colG"><label for="colG">🟢 Green (G)</label></div>
                         <div class="multiselect-option"><input type="checkbox" value="c" id="colC"><label for="colC">💎 Colorless (C)</label></div>
                         <div class="multiselect-option"><input type="checkbox" value="multi" id="colMulti"><label for="colMulti">🌈 Multicolor</label></div>
+                        <div class="multiselect-option" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+                            <input type="checkbox" id="excludeMulti">
+                            <label for="excludeMulti" style="color: var(--accent-rose); font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none;">🚫 Exclude Multicolor</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1182,7 +1186,7 @@
         const cards = document.querySelectorAll('.card-item');
 
         // Get checked values from multiselects
-        const selectedColors = Array.from(document.querySelectorAll('#colorContent input[type="checkbox"]:checked')).map(cb => cb.value);
+        const selectedColors = Array.from(document.querySelectorAll('#colorContent input[type="checkbox"]:checked:not(#excludeMulti)')).map(cb => cb.value);
         const selectedSets = Array.from(document.querySelectorAll('#setContent input[type="checkbox"]:checked')).map(cb => cb.value);
         const selectedTypes = Array.from(document.querySelectorAll('#typeContent input[type="checkbox"]:checked')).map(cb => cb.value);
         const selectedRarities = Array.from(document.querySelectorAll('#rarityContent input[type="checkbox"]:checked')).map(cb => cb.value);
@@ -1192,7 +1196,15 @@
         const filterBannedAll = document.getElementById('cmdrBanned')?.checked || false;
 
         // Update buttons texts to reflect selected count
-        updateBtnText(document.getElementById('colorBtn'), selectedColors, 'All Colors');
+        const excludeMulti = document.getElementById('excludeMulti')?.checked || false;
+        const friendlyColors = selectedColors.map(c => {
+            const labelMap = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless', multi: 'Multicolor' };
+            return labelMap[c] || c;
+        });
+        if (excludeMulti) {
+            friendlyColors.push('Mono Only');
+        }
+        updateBtnText(document.getElementById('colorBtn'), friendlyColors, 'All Colors');
         updateBtnText(document.getElementById('setBtn'), selectedSets, 'All Sets');
         updateBtnText(document.getElementById('typeBtn'), selectedTypes, 'All Types');
         updateBtnText(document.getElementById('rarityBtn'), selectedRarities, 'All Rarities');
@@ -1208,7 +1220,7 @@
 
         // Calculate active filter count to show on the badge
         let activeFilterCount = 0;
-        if (selectedColors.length > 0) activeFilterCount++;
+        if (selectedColors.length > 0 || excludeMulti) activeFilterCount++;
         if (selectedSets.length > 0) activeFilterCount++;
         if (selectedTypes.length > 0) activeFilterCount++;
         if (selectedRarities.length > 0) activeFilterCount++;
@@ -1301,14 +1313,27 @@
             let matchesColor = true;
             if (selectedColors.length > 0) {
                 matchesColor = false;
+                const cardColorCount = color.split(',').filter(Boolean).length;
+                const isCardMulticolor = cardColorCount > 1;
+                
                 for (const colVal of selectedColors) {
                     if (colVal === 'c') {
                         if (!color) { matchesColor = true; break; }
                     } else if (colVal === 'multi') {
-                        if (color.split(',').filter(Boolean).length > 1) { matchesColor = true; break; }
+                        if (isCardMulticolor && !excludeMulti) { matchesColor = true; break; }
                     } else {
-                        if (color.includes(colVal)) { matchesColor = true; break; }
+                        if (color.includes(colVal)) {
+                            if (!excludeMulti || !isCardMulticolor) {
+                                matchesColor = true;
+                                break;
+                            }
+                        }
                     }
+                }
+            } else if (excludeMulti) {
+                const cardColorCount = color.split(',').filter(Boolean).length;
+                if (cardColorCount > 1) {
+                    matchesColor = false;
                 }
             }
 
