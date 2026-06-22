@@ -286,7 +286,7 @@ def add_card():
                 'commander', 'pauper', 'brawl', 'explorer', 'historic', 
                 'alchemy', 'timeless', 'oathbreaker'
             ]
-            is_illegal = all(legalities.get(fmt) in ['not_legal', 'banned'] for fmt in major_formats)
+            is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
             
             db.session.add(Card(name=d['name'], set_code=set_code, 
                                 collector_number=collector_number, 
@@ -1029,7 +1029,7 @@ def claim_wishlist_card(card_id):
                     'commander', 'pauper', 'brawl', 'explorer', 'historic', 
                     'alchemy', 'timeless', 'oathbreaker'
                 ]
-                is_illegal = all(legalities.get(fmt) in ['not_legal', 'banned'] for fmt in major_formats)
+                is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
         except Exception:
             pass
             
@@ -1477,7 +1477,7 @@ def backfill_cards():
                     'commander', 'pauper', 'brawl', 'explorer', 'historic', 
                     'alchemy', 'timeless', 'oathbreaker'
                 ]
-                card.is_illegal = all(legalities.get(fmt) in ['not_legal', 'banned'] for fmt in major_formats)
+                card.is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
                 
                 count += 1
         except Exception:
@@ -1626,7 +1626,7 @@ def process_imported_cards(deck_name, format_name, description, raw_cards):
                 'commander', 'pauper', 'brawl', 'explorer', 'historic', 
                 'alchemy', 'timeless', 'oathbreaker'
             ]
-            is_illegal = all(legalities.get(fmt) in ['not_legal', 'banned'] for fmt in major_formats)
+            is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
 
             db_card = Card(
                 name=sc['name'],
