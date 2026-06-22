@@ -679,7 +679,9 @@
                          data-colors="{{ card.colors or '' }}"
                          data-is-illegal="{{ card.is_illegal|int }}"
                          data-image="{{ card.image_url or '' }}"
-                         data-is-commander="{{ card.is_commander_candidate|int }}">
+                         data-is-commander="{{ card.is_commander_candidate|int }}"
+                         data-is-vintage="{{ (card.is_vintage and card.released_at and card.released_at < '2003-07-28')|int }}">
+
                         
                         <!-- Rank Badge -->
                         <div class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}normal{% endif %}" title="Rank #{{ loop.index }}">
@@ -773,7 +775,8 @@
                          data-colors="{{ card.colors or '' }}"
                          data-is-illegal="{{ card.is_illegal|int }}"
                          data-image="{{ card.image_url or '' }}"
-                         data-is-commander="{{ card.is_commander_candidate|int }}">
+                         data-is-commander="{{ card.is_commander_candidate|int }}"
+                         data-is-vintage="{{ (card.is_vintage and card.released_at and card.released_at < '2003-07-28')|int }}">
                         
                         <!-- Rank Badge -->
                         <div class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}normal{% endif %}" title="Rank #{{ loop.index }}">
@@ -922,6 +925,7 @@
                 const typeLine = card.dataset.typeLine;
                 const isIllegal = parseInt(card.dataset.isIllegal);
                 const image = card.dataset.image;
+                const isVintage = parseInt(card.dataset.isVintage);
 
                 // Populate modal
                 document.getElementById('modalCardImage').src = image || '/static/placeholder.jpg';
@@ -944,6 +948,16 @@
                     modalFoilText.style.color = '';
                     if (modalFoilSheen) modalFoilSheen.style.display = 'none';
                 }
+
+                const eraSpan = document.getElementById('modalCardEra');
+                if (eraSpan) {
+                    if (isVintage) {
+                        eraSpan.innerHTML = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; padding: 2px 8px; border-radius: 4px;">👑 Vintage</span>';
+                    } else {
+                        eraSpan.innerHTML = '<span class="badge" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); font-weight: 700; padding: 2px 8px; border-radius: 4px;">⚡ Modern</span>';
+                    }
+                }
+
 
                 // Reset and populate live format legalities grid from Scryfall
                 const legalitiesGrid = document.getElementById('modalLegalitiesGrid');
@@ -1123,7 +1137,12 @@
                         <span class="detail-label">Printing</span>
                         <span id="modalCardFoil" class="detail-value"></span>
                     </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Era / Format</span>
+                        <span id="modalCardEra" class="detail-value"></span>
+                    </div>
                 </div>
+
 
                 <div style="margin-top: 20px;">
                     <span class="detail-label" style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--text-muted); font-weight: 600;">Format Legalities</span>

@@ -73,7 +73,10 @@
                 <span class="badge condition-{{ card.condition|lower|replace(' ', '-') }}">{{ card.condition }}</span>
             {% endif %}
             {% if card.is_commander_candidate %}
-                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Can be your Commander">👑 Commander</span>
+                <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);" title="Can be your Commander">👑 Commander</span>
+            {% endif %}
+            {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
+                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Vintage Card (Pre-Modern)">👑 Vintage</span>
             {% endif %}
         </div>
         
@@ -91,6 +94,18 @@
                 <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600;">{{ card.condition or 'Near Mint' }}</td>
             </tr>
             <tr>
+                <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Era / Format</td>
+                <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600;">
+                    {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
+                        <span style="color: var(--accent-gold);">Vintage (Pre-Modern)</span>
+                    {% elif card.is_modern %}
+                        <span style="color: var(--accent-cyan);">Modern</span>
+                    {% else %}
+                        <span style="color: var(--text-muted);">Other</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Price (USD)</td>
                 <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(card.price) }}</td>
             </tr>
@@ -99,6 +114,7 @@
                 <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-purple);">{{ card.quantity }} pcs</td>
             </tr>
         </table>
+
         
         {% if legalities %}
             <h3 style="margin-top: 20px; margin-bottom: 12px; font-family: 'Cinzel', serif; font-size: 1.15rem;">Format Legality</h3>
