@@ -1691,6 +1691,31 @@
         rarityBadge.textContent = item.rarity;
         rarityBadge.className = `badge badge-${item.rarity.toLowerCase()}`;
 
+        const warningDiv = document.getElementById('modalLegalityWarning');
+        if (warningDiv) {
+            const majorFormats = [
+                'standard', 'pioneer', 'modern', 'legacy', 'vintage', 
+                'commander', 'pauper', 'brawl', 'explorer', 'historic', 
+                'alchemy', 'timeless', 'oathbreaker'
+            ];
+            const isIllegal = item.legalities ? !majorFormats.some(fmt => ['legal', 'restricted'].includes(item.legalities[fmt])) : false;
+            if (isIllegal) {
+                const offensiveBannedCards = [
+                    'pradesh gypsies', 'invoke prejudice', 'cleanse', 
+                    'stone-throwing devils', 'crusade', 'imprison', 'jihad'
+                ];
+                const lowercaseName = item.name.toLowerCase();
+                if (offensiveBannedCards.some(n => lowercaseName.includes(n))) {
+                    warningDiv.textContent = "⚠️ This card has been officially banned in all sanctioned play and removed from official databases by Wizards of the Coast due to containing racist or culturally offensive depictions.";
+                } else {
+                    warningDiv.textContent = "⚠️ This card is banned or not legal in all major sanctioned Magic: The Gathering tournament formats (Standard, Modern, Commander, etc.).";
+                }
+                warningDiv.style.display = 'block';
+            } else {
+                warningDiv.style.display = 'none';
+            }
+        }
+
         const legalitiesGrid = document.getElementById('modalLegalitiesGrid');
         legalitiesGrid.innerHTML = '';
         
@@ -1968,7 +1993,7 @@
             modalFoilBtn.style.display = 'none';
         }
 
-        modal.style.display = 'block';
+        modal.style.display = 'flex';
     }
 
     // Modal close listeners setup
@@ -2122,8 +2147,8 @@
 
 {% block modal %}
 <!-- Card Detail Modal -->
-<div id="cardDetailModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow-y: auto; background-color: rgba(12, 10, 28, 0.85); backdrop-filter: blur(8px); padding: 20px; box-sizing: border-box;">
-    <div style="background: linear-gradient(135deg, rgba(25, 20, 50, 0.95), rgba(12, 10, 28, 0.98)); border: 1px solid rgba(var(--accent-purple-rgb), 0.3); border-radius: 20px; max-width: 600px; width: 100%; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.6); position: relative; animation: modalFadeIn 0.3s ease; margin: 40px auto;">
+<div id="cardDetailModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(12, 10, 28, 0.85); backdrop-filter: blur(8px); padding: 20px; box-sizing: border-box; align-items: center; justify-content: center;">
+    <div style="background: linear-gradient(135deg, rgba(25, 20, 50, 0.95), rgba(12, 10, 28, 0.98)); border: 1px solid rgba(var(--accent-purple-rgb), 0.3); border-radius: 20px; max-width: 600px; width: 100%; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.6); position: relative; animation: modalFadeIn 0.3s ease; margin: 0; max-height: calc(100vh - 40px); overflow-y: auto; scrollbar-width: thin;">
         <!-- Close button in top corner -->
         <button id="closeModalBtn" style="position: absolute; top: 12px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 1.8rem; cursor: pointer; transition: color 0.2s; z-index: 10;">&times;</button>
         
@@ -2143,6 +2168,11 @@
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span id="modalCardRarityBadge" class="badge" style="font-size: 0.75rem; padding: 3px 8px;">Rare</span>
                     <span id="modalCardNumber" style="font-size: 0.8rem; color: var(--text-muted);">#000</span>
+                </div>
+                
+                <!-- Legality Explanation Warning -->
+                <div id="modalLegalityWarning" style="display: none; padding: 10px 12px; background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: 8px; color: var(--accent-rose); font-size: 0.8rem; line-height: 1.4; font-weight: 500;">
+                    <!-- JS populated -->
                 </div>
                 
                 <!-- Format Legalities -->
