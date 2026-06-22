@@ -987,8 +987,6 @@
                             {% endif %}
                             {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
                                 <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3);" title="Vintage Card (Pre-Modern)">👑 Vintage</span>
-                            {% elif card.is_modern %}
-                                <span class="badge" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3);" title="Modern Legal">⚡ Modern</span>
                             {% endif %}
                         </div>
                     </div>
@@ -1700,15 +1698,10 @@
         const eraBadge = document.getElementById('modalCardEraBadge');
         if (eraBadge) {
             const isVintage = item.legalities && (item.legalities.vintage === 'legal' || item.legalities.vintage === 'restricted') && item.released_at && item.released_at < '2003-07-28';
-            const isModern = item.legalities && (item.legalities.modern === 'legal' || item.legalities.modern === 'restricted');
             
             if (isVintage) {
                 eraBadge.textContent = '👑 Vintage';
                 eraBadge.style.cssText = 'font-size: 0.75rem; padding: 3px 8px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; border-radius: 4px;';
-                eraBadge.style.display = 'inline-block';
-            } else if (isModern) {
-                eraBadge.textContent = '⚡ Modern';
-                eraBadge.style.cssText = 'font-size: 0.75rem; padding: 3px 8px; background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); font-weight: 700; border-radius: 4px;';
                 eraBadge.style.display = 'inline-block';
             } else {
                 eraBadge.style.display = 'none';

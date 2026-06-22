@@ -93,18 +93,13 @@
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Condition</td>
                 <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600;">{{ card.condition or 'Near Mint' }}</td>
             </tr>
+            {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
             <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Era / Format</td>
-                <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600;">
-                    {% if card.is_vintage and card.released_at and card.released_at < '2003-07-28' %}
-                        <span style="color: var(--accent-gold);">Vintage (Pre-Modern)</span>
-                    {% elif card.is_modern %}
-                        <span style="color: var(--accent-cyan);">Modern</span>
-                    {% else %}
-                        <span style="color: var(--text-muted);">Other</span>
-                    {% endif %}
-                </td>
+                <td style="border: none; padding: 8px 0; font-size: 1.1rem; font-weight: 600; color: var(--accent-gold);">Vintage (Pre-Modern)</td>
             </tr>
+            {% endif %}
+
             <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Price (USD)</td>
                 <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(card.price) }}</td>
