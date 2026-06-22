@@ -240,6 +240,16 @@
         </span>
     </div>
     <div class="change-card">
+        <span class="period-label">1-Week Change</span>
+        <span class="change-value {% if change_1w %}{% if change_1w > 0 %}positive{% elif change_1w < 0 %}negative{% endif %}{% endif %}">
+            {% if change_1w is not none %}
+                {{ "+" if change_1w > 0 }}{{ "%.2f"|format(change_1w) }}%
+            {% else %}
+                —
+            {% endif %}
+        </span>
+    </div>
+    <div class="change-card">
         <span class="period-label">1-Month Change</span>
         <span class="change-value {% if change_1m %}{% if change_1m > 0 %}positive{% elif change_1m < 0 %}negative{% endif %}{% endif %}">
             {% if change_1m is not none %}

@@ -449,6 +449,7 @@ def dashboard():
         return ((total_value - value_then) / value_then) * 100
 
     change_1d = get_percentage_change(1)
+    change_1w = get_percentage_change(7)
     change_1m = get_percentage_change(30)
     change_6m = get_percentage_change(180)
     change_1y = get_percentage_change(365)
@@ -680,6 +681,7 @@ def dashboard():
         rarity_stats=rarity_stats,
         history_data=history_data,
         change_1d=change_1d,
+        change_1w=change_1w,
         change_1m=change_1m,
         change_6m=change_6m,
         change_1y=change_1y,
