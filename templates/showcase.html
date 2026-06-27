@@ -1295,7 +1295,43 @@
         <span style="font-family: sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); -webkit-text-fill-color: var(--text-muted);">
             ({{ comments|length }})
         </span>
+        {% if is_jbell and pending_comments %}
+        <span style="font-family: sans-serif; font-size: 0.78rem; font-weight: 700; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #f59e0b; -webkit-text-fill-color: #f59e0b; padding: 3px 10px; border-radius: 20px; margin-left: 6px;">
+            {{ pending_comments|length }} pending
+        </span>
+        {% endif %}
     </div>
+
+    {# ---- jbell moderation panel for pending guest comments ---- #}
+    {% if is_jbell and pending_comments %}
+    <div style="background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.3); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+            🛡️ Pending Guest Comments — Awaiting Your Approval
+        </div>
+        {% for c in pending_comments %}
+        <div style="background: rgba(20,16,36,0.5); border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;">
+            <div class="comment-avatar" style="background: linear-gradient(135deg, #92400e, #f59e0b); flex-shrink: 0;">{{ c.author_name[0]|upper }}</div>
+            <div style="flex: 1; min-width: 0;">
+                <div class="comment-meta">
+                    <span class="comment-author" style="color: #f59e0b;">{{ c.author_name }}</span>
+                    <span class="comment-date">{{ c.created_at.strftime('%b %d, %Y at %I:%M %p') }}</span>
+                    <span style="font-size: 0.7rem; background: rgba(245,158,11,0.15); color: #f59e0b; padding: 1px 7px; border-radius: 10px; border: 1px solid rgba(245,158,11,0.3);">Guest</span>
+                </div>
+                <div class="comment-body">{{ c.body }}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                <form action="/showcase/{{ showcase_user.username }}/comment/{{ c.id }}/approve" method="POST">
+                    <button type="submit" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap;" onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">✓ Approve</button>
+                </form>
+                <form action="/showcase/{{ showcase_user.username }}/comment/{{ c.id }}/reject" method="POST">
+                    <button type="submit" style="background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); color: var(--accent-rose); border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap;" onclick="return confirm('Reject and delete this comment?')" onmouseover="this.style.background='rgba(244,63,94,0.25)'" onmouseout="this.style.background='rgba(244,63,94,0.1)'">✕ Reject</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {# ---- end moderation panel ---- #}
 
     {% if comments %}
         {% for c in comments %}
@@ -1318,6 +1354,7 @@
         {% endfor %}
     {% else %}
         <div class="no-comments-msg">No comments yet — be the first to leave one!</div>
+
     {% endif %}
 
     <!-- Post a comment -->

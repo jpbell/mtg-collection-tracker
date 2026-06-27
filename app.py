@@ -183,6 +183,7 @@ class ShowcaseComment(db.Model):
     author_name = db.Column(db.String(80), nullable=False, default='Anonymous')
     body = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_approved = db.Column(db.Boolean, default=True, server_default='1')  # guests default False, logged-in True
 
     showcase_user = db.relationship('User', foreign_keys=[showcase_user_id])
     author_user  = db.relationship('User', foreign_keys=[author_user_id])
@@ -262,11 +263,22 @@ def upgrade_database_schema():
                         author_user_id INTEGER REFERENCES user(id),
                         author_name VARCHAR(80) NOT NULL DEFAULT 'Anonymous',
                         body TEXT NOT NULL,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        is_approved INTEGER NOT NULL DEFAULT 1
                     )
                 """))
         except Exception as e:
             print(f"Failed to create showcase_comment table: {e}")
+    else:
+        # Add is_approved column to existing table if missing
+        sc_columns = [c['name'] for c in inspector.get_columns('showcase_comment')]
+        if 'is_approved' not in sc_columns:
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(db.text("ALTER TABLE showcase_comment ADD COLUMN is_approved INTEGER NOT NULL DEFAULT 1"))
+                    # All existing comments (posted by logged-in users) are already approved
+            except Exception as e:
+                print(f"Failed to add is_approved to showcase_comment: {e}")
 
 
 with app.app_context():
@@ -2914,7 +2926,7 @@ def showcase_index():
         ).order_by(Card.price.desc()).first()
         modern_top = Card.query.filter_by(user_id=u.id, is_modern=True).order_by(Card.price.desc()).first()
         top_card = vintage_top or modern_top
-        comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id).count()
+        comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id, is_approved=True).count()
         showcases.append({
             'user': u,
             'total_value': total_val,
@@ -2958,16 +2970,30 @@ def view_showcase(username=None):
     if total_collection_val > 0:
         concentration = (total_value / total_collection_val) * 100
 
-    comments = ShowcaseComment.query.filter_by(showcase_user_id=user.id).order_by(ShowcaseComment.created_at.desc()).all()
-        
-    return render_template('showcase.html', 
+    # Only show approved comments publicly; jbell also sees pending queue
+    jbell_user = User.query.filter_by(username='jbell').first()
+    is_jbell = jbell_user and session.get('user_id') == jbell_user.id
+
+    approved_comments = ShowcaseComment.query.filter_by(
+        showcase_user_id=user.id, is_approved=True
+    ).order_by(ShowcaseComment.created_at.desc()).all()
+
+    pending_comments = []
+    if is_jbell:
+        pending_comments = ShowcaseComment.query.filter_by(
+            showcase_user_id=user.id, is_approved=False
+        ).order_by(ShowcaseComment.created_at.asc()).all()
+
+    return render_template('showcase.html',
                            vintage_cards=vintage_cards,
                            modern_cards=modern_cards,
-                           total_value=total_value, 
-                           total_qty=total_qty, 
+                           total_value=total_value,
+                           total_qty=total_qty,
                            concentration=concentration,
                            showcase_user=user,
-                           comments=comments)
+                           comments=approved_comments,
+                           pending_comments=pending_comments,
+                           is_jbell=is_jbell)
 
 
 @app.route('/showcase/<username>/comment', methods=['POST'])
@@ -2985,20 +3011,26 @@ def post_showcase_comment(username):
         author = User.query.get(session['user_id'])
         author_name = author.username if author else 'Anonymous'
         author_id = session['user_id']
+        is_approved = True  # logged-in users are auto-approved
     else:
         raw_name = (request.form.get('author_name') or '').strip()
         author_name = raw_name[:80] if raw_name else 'Anonymous'
         author_id = None
+        is_approved = False  # guests require jbell approval
 
     comment = ShowcaseComment(
         showcase_user_id=showcase_user.id,
         author_user_id=author_id,
         author_name=author_name,
-        body=body
+        body=body,
+        is_approved=is_approved
     )
     db.session.add(comment)
     db.session.commit()
-    flash('Comment posted!', 'success')
+    if is_approved:
+        flash('Comment posted!', 'success')
+    else:
+        flash('Your comment has been submitted and is awaiting approval.', 'success')
     return redirect(url_for('view_showcase', username=username) + '#comments')
 
 
@@ -3016,6 +3048,32 @@ def delete_showcase_comment(username, comment_id):
     db.session.delete(comment)
     db.session.commit()
     flash('Comment removed.', 'success')
+    return redirect(url_for('view_showcase', username=username) + '#comments')
+
+
+@app.route('/showcase/<username>/comment/<int:comment_id>/approve', methods=['POST'])
+def approve_showcase_comment(username, comment_id):
+    """Approve a pending guest comment — only jbell can do this."""
+    jbell_user = User.query.filter_by(username='jbell').first()
+    if not jbell_user or session.get('user_id') != jbell_user.id:
+        abort(403)
+    comment = ShowcaseComment.query.get_or_404(comment_id)
+    comment.is_approved = True
+    db.session.commit()
+    flash(f'Comment by "{comment.author_name}" approved.', 'success')
+    return redirect(url_for('view_showcase', username=username) + '#comments')
+
+
+@app.route('/showcase/<username>/comment/<int:comment_id>/reject', methods=['POST'])
+def reject_showcase_comment(username, comment_id):
+    """Reject (delete) a pending guest comment — only jbell can do this."""
+    jbell_user = User.query.filter_by(username='jbell').first()
+    if not jbell_user or session.get('user_id') != jbell_user.id:
+        abort(403)
+    comment = ShowcaseComment.query.get_or_404(comment_id)
+    db.session.delete(comment)
+    db.session.commit()
+    flash(f'Comment rejected and removed.', 'success')
     return redirect(url_for('view_showcase', username=username) + '#comments')
 
 
