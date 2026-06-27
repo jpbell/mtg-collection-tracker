@@ -168,6 +168,31 @@
             font-size: 1.4rem;
         }
     }
+
+    /* Keyword Cards Styling */
+    .keyword-card {
+        background: rgba(255,255,255,0.015);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    }
+
+    .keyword-card:hover {
+        border-color: var(--accent-purple) !important;
+        box-shadow: 0 4px 15px rgba(168, 85, 247, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .bs-quick-life-btn.active-category {
+        background: var(--accent-purple) !important;
+        border-color: var(--accent-purple) !important;
+        color: white !important;
+        box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
+    }
 </style>
 
 <div class="formats-header">
@@ -452,6 +477,224 @@
     </div>
 </div>
 
+<!-- ===== Keyword Glossary Section ===== -->
+<div class="format-card" style="margin-top: 40px;">
+    <h2 style="font-family: 'Cinzel', serif; font-size: 1.5rem; color: var(--text-main); margin-top: 0; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+        🔮 Spellbook Glossary: Keyword Definitions
+    </h2>
+    <p style="color: var(--text-muted); margin: 0 0 24px 0; font-size: 0.92rem;">Quickly search and lookup rules and mechanics definitions for common Magic keywords.</p>
+
+    <!-- Search & Filter Controls -->
+    <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+        <input type="text" id="keywordSearch" placeholder="Type to search keywords (e.g., Flying, Hexproof, Mill)..." style="flex-grow: 1; max-width: 450px; min-width: 250px; background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); color: var(--text-main); padding: 10px 14px; border-radius: 8px; outline: none; font-size: 0.9rem;" onkeyup="filterKeywords()">
+        
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="bs-quick-life-btn active-category" onclick="filterCategory('all')" id="cat-all" style="padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); color: var(--text-muted);">All</button>
+            <button class="bs-quick-life-btn" onclick="filterCategory('combat')" id="cat-combat" style="padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); color: var(--text-muted);">Combat</button>
+            <button class="bs-quick-life-btn" onclick="filterCategory('protection')" id="cat-protection" style="padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); color: var(--text-muted);">Protection</button>
+            <button class="bs-quick-life-btn" onclick="filterCategory('actions')" id="cat-actions" style="padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); color: var(--text-muted);">Spells & Actions</button>
+        </div>
+    </div>
+
+    <!-- Keywords Grid -->
+    <div id="keywordsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+        <!-- Combat -->
+        <div class="keyword-card" data-name="flying" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Flying</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This creature can't be blocked except by creatures with flying or reach.</p>
+        </div>
+
+        <div class="keyword-card" data-name="reach" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Reach</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This creature can block creatures with flying (even though it doesn't have flying itself).</p>
+        </div>
+
+        <div class="keyword-card" data-name="trample" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Trample</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Deals excess combat damage to the defending player or planeswalker after destroying all blockers.</p>
+        </div>
+
+        <div class="keyword-card" data-name="haste" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Haste</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This creature can attack and tap as soon as it enters the battlefield (ignores summoning sickness).</p>
+        </div>
+
+        <div class="keyword-card" data-name="first strike" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">First Strike</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This creature deals combat damage before creatures without first strike.</p>
+        </div>
+
+        <div class="keyword-card" data-name="double strike" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Double Strike</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Deals combat damage twice: once during the first-strike step, and once during the regular step.</p>
+        </div>
+
+        <div class="keyword-card" data-name="vigilance" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Vigilance</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Attacking doesn't cause this creature to tap, keeping it ready to block on opponents' turns.</p>
+        </div>
+
+        <div class="keyword-card" data-name="lifelink" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Lifelink</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Damage dealt by this creature also causes you to gain that much life.</p>
+        </div>
+
+        <div class="keyword-card" data-name="deathtouch" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Deathtouch</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Any amount of damage this creature deals to another creature is enough to destroy it.</p>
+        </div>
+
+        <div class="keyword-card" data-name="defender" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Defender</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This creature cannot attack. It can only be used as a blocker.</p>
+        </div>
+
+        <div class="keyword-card" data-name="menace" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Menace</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This creature cannot be blocked except by two or more creatures.</p>
+        </div>
+
+        <div class="keyword-card" data-name="prowess" data-category="combat">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Prowess</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.1); color: var(--accent-cyan); font-weight: bold; text-transform: uppercase;">Combat</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.</p>
+        </div>
+
+        <!-- Protection -->
+        <div class="keyword-card" data-name="hexproof" data-category="protection">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Hexproof</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.1); color: var(--accent-purple); font-weight: bold; text-transform: uppercase;">Protection</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This permanent cannot be the target of spells or abilities controlled by your opponents.</p>
+        </div>
+
+        <div class="keyword-card" data-name="shroud" data-category="protection">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Shroud</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.1); color: var(--accent-purple); font-weight: bold; text-transform: uppercase;">Protection</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This permanent cannot be the target of spells or abilities by any player (including its controller).</p>
+        </div>
+
+        <div class="keyword-card" data-name="ward" data-category="protection">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Ward</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.1); color: var(--accent-purple); font-weight: bold; text-transform: uppercase;">Protection</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Whenever this becomes targeted by an opponent's spell/ability, counter it unless they pay the specified Ward cost.</p>
+        </div>
+
+        <div class="keyword-card" data-name="protection" data-category="protection">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Protection</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.1); color: var(--accent-purple); font-weight: bold; text-transform: uppercase;">Protection</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Cannot be blocked, targeted, dealt damage, or enchanted/equipped by anything matching the quality (e.g. Protection from Blue).</p>
+        </div>
+
+        <div class="keyword-card" data-name="indestructible" data-category="protection">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Indestructible</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.1); color: var(--accent-purple); font-weight: bold; text-transform: uppercase;">Protection</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">This permanent cannot be destroyed by effects that say "destroy", nor by combat or effect damage.</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="keyword-card" data-name="flash" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Flash</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">You may cast this spell at any time you could cast an instant (even on an opponent's turn).</p>
+        </div>
+
+        <div class="keyword-card" data-name="counter" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Counter</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Cancel a spell or activated/triggered ability, sending it to the graveyard. It does not resolve.</p>
+        </div>
+
+        <div class="keyword-card" data-name="scry" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Scry</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Look at the top X cards of your library. Put any number on the bottom, and the rest on top in any order.</p>
+        </div>
+
+        <div class="keyword-card" data-name="mill" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Mill</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Put the top X cards of a player's library directly into their graveyard.</p>
+        </div>
+
+        <div class="keyword-card" data-name="exile" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Exile</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Completely remove a card from the active game, placing it in the exile zone.</p>
+        </div>
+
+        <div class="keyword-card" data-name="kicker" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Kicker</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">You may pay an optional additional cost as you cast this spell for a bonus or enhanced effect.</p>
+        </div>
+
+        <div class="keyword-card" data-name="sacrifice" data-category="actions">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Sacrifice</span>
+                <span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.1); color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Actions</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4; margin: 4px 0 0 0;">Choose a permanent you control and put it into its owner's graveyard (cannot be targeted or destroyed by protection/hexproof).</p>
+        </div>
+    </div>
+</div>
+
 <script>
     // Tab switching logic
     function switchFormat(formatName) {
@@ -485,5 +728,43 @@
             link.classList.remove('active');
         }
     });
+
+    // Keyword Filtering Logic
+    let activeCategory = 'all';
+    
+    function filterCategory(category) {
+        activeCategory = category;
+        
+        ['all', 'combat', 'protection', 'actions'].forEach(cat => {
+            const btn = document.getElementById(`cat-${cat}`);
+            if (cat === category) {
+                btn.classList.add('active-category');
+            } else {
+                btn.classList.remove('active-category');
+            }
+        });
+        
+        filterKeywords();
+    }
+    
+    function filterKeywords() {
+        const query = document.getElementById('keywordSearch').value.toLowerCase().trim();
+        const cards = document.querySelectorAll('.keyword-card');
+        
+        cards.forEach(card => {
+            const name = card.dataset.name.toLowerCase();
+            const desc = card.querySelector('p').textContent.toLowerCase();
+            const cat = card.dataset.category;
+            
+            const matchesSearch = name.includes(query) || desc.includes(query);
+            const matchesCategory = activeCategory === 'all' || cat === activeCategory;
+            
+            if (matchesSearch && matchesCategory) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
 </script>
 {% endblock %}
