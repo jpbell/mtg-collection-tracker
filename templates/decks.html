@@ -295,6 +295,16 @@
                         </div>
                     </h3>
                     <p class="deck-desc">{{ d.description or 'No strategy description provided.' }}</p>
+                    <div style="margin-top: -10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; border-top: 1px solid rgba(255, 255, 255, 0.03); padding-top: 8px; color: var(--text-muted);">
+                        <span>Record: <strong style="color: var(--text-main); font-weight: 700;">{{ d.wins }}W - {{ d.losses }}L - {{ d.draws }}D</strong></span>
+                        {% set total_games = d.wins + d.losses + d.draws %}
+                        {% if total_games > 0 %}
+                            {% set win_rate = (d.wins / total_games * 100)|round(1) %}
+                            <span style="color: {% if win_rate >= 50 %}var(--accent-green){% else %}var(--accent-rose){% endif %}; font-weight: 600;">{{ win_rate }}% WR</span>
+                        {% else %}
+                            <span style="color: var(--text-muted); font-style: italic;">No games played</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="deck-meta">
                     <span style="font-weight: 600; color: var(--accent-cyan);">

@@ -532,6 +532,73 @@
     </div>
 </div>
 
+<!-- Match Record Tracker -->
+<div class="analytics-panel" style="margin-bottom: 30px; background: rgba(16, 185, 129, 0.015); border: 1px solid rgba(16, 185, 129, 0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
+                ⚔️ Match Record Tracker
+            </h3>
+            <p style="color: var(--text-muted); margin: 4px 0 0 0; font-size: 0.85rem;">Track the performance of this spell deck in your duels.</p>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <!-- Wins -->
+            <div style="display: flex; flex-direction: column; align-items: center; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 8px 14px; border-radius: 10px; min-width: 80px; transition: transform 0.2s ease;">
+                <span style="font-size: 0.7rem; color: var(--accent-green); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Wins</span>
+                <span id="wins-display" style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); line-height: 1.2; margin: 4px 0;">{{ deck.wins }}</span>
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-secondary" onclick="adjustStat('wins', -1)" style="padding: 2px 6px; font-size: 0.7rem; height: 20px; border-radius: 4px; line-height: 1; cursor: pointer;">-</button>
+                    <button class="btn btn-secondary" onclick="adjustStat('wins', 1)" style="padding: 2px 6px; font-size: 0.7rem; height: 20px; border-radius: 4px; line-height: 1; color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3); cursor: pointer;">+</button>
+                </div>
+            </div>
+            
+            <!-- Losses -->
+            <div style="display: flex; flex-direction: column; align-items: center; background: rgba(244, 63, 94, 0.05); border: 1px solid rgba(244, 63, 94, 0.2); padding: 8px 14px; border-radius: 10px; min-width: 80px; transition: transform 0.2s ease;">
+                <span style="font-size: 0.7rem; color: var(--accent-rose); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Losses</span>
+                <span id="losses-display" style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); line-height: 1.2; margin: 4px 0;">{{ deck.losses }}</span>
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-secondary" onclick="adjustStat('losses', -1)" style="padding: 2px 6px; font-size: 0.7rem; height: 20px; border-radius: 4px; line-height: 1; cursor: pointer;">-</button>
+                    <button class="btn btn-secondary" onclick="adjustStat('losses', 1)" style="padding: 2px 6px; font-size: 0.7rem; height: 20px; border-radius: 4px; line-height: 1; color: var(--accent-rose); border-color: rgba(244, 63, 94, 0.3); cursor: pointer;">+</button>
+                </div>
+            </div>
+            
+            <!-- Draws -->
+            <div style="display: flex; flex-direction: column; align-items: center; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--panel-border); padding: 8px 14px; border-radius: 10px; min-width: 80px; transition: transform 0.2s ease;">
+                <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Draws</span>
+                <span id="draws-display" style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); line-height: 1.2; margin: 4px 0;">{{ deck.draws }}</span>
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-secondary" onclick="adjustStat('draws', -1)" style="padding: 2px 6px; font-size: 0.7rem; height: 20px; border-radius: 4px; line-height: 1; cursor: pointer;">-</button>
+                    <button class="btn btn-secondary" onclick="adjustStat('draws', 1)" style="padding: 2px 6px; font-size: 0.7rem; height: 20px; border-radius: 4px; line-height: 1; cursor: pointer;">+</button>
+                </div>
+            </div>
+            
+            <!-- Win Rate Summary -->
+            <div style="display: flex; flex-direction: column; align-items: center; background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.2); padding: 8px 14px; border-radius: 10px; min-width: 90px;">
+                <span style="font-size: 0.7rem; color: var(--accent-cyan); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Win Rate</span>
+                {% set total_games = deck.wins + deck.losses + deck.draws %}
+                <span id="winrate-display" style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); line-height: 1.2; margin: 4px 0;">
+                    {% if total_games > 0 %}
+                        {{ ((deck.wins / total_games) * 100)|round(1) }}%
+                    {% else %}
+                        -
+                    {% endif %}
+                </span>
+                <span id="total-display" style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                    {{ total_games }} Match{% if total_games != 1 %}es{% endif %}
+                </span>
+            </div>
+            
+            <!-- Actions -->
+            <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: 100%;">
+                <button class="delete-link" onclick="resetRecord()" style="font-size: 0.72rem; cursor: pointer; background: none; border: none; padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
+                    🔄 Reset Record
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Add Cards Grid -->
 <div class="add-panels-grid">
     <!-- Add Card from Collection -->
@@ -798,6 +865,67 @@
             link.classList.remove('active');
         }
     });
+
+    // Record Tracker Functions
+    function adjustStat(field, amount) {
+        fetch(`/deck/{{ deck.id }}/record/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ field: field, amount: amount })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('wins-display').innerText = data.wins;
+                document.getElementById('losses-display').innerText = data.losses;
+                document.getElementById('draws-display').innerText = data.draws;
+                
+                const total = data.wins + data.losses + data.draws;
+                if (total > 0) {
+                    const wr = ((data.wins / total) * 100).toFixed(1);
+                    document.getElementById('winrate-display').innerText = wr + '%';
+                    document.getElementById('total-display').innerText = total + ' Match' + (total !== 1 ? 'es' : '');
+                } else {
+                    document.getElementById('winrate-display').innerText = '-';
+                    document.getElementById('total-display').innerText = '0 Matches';
+                }
+                
+                // Add a subtle scale pop animation on update
+                const targetEl = document.getElementById(field + '-display');
+                targetEl.style.transform = 'scale(1.25)';
+                targetEl.style.transition = 'transform 0.1s ease';
+                setTimeout(() => {
+                    targetEl.style.transform = 'scale(1)';
+                }, 100);
+            } else {
+                alert(data.error || 'Failed to update record');
+            }
+        })
+        .catch(err => console.error('Error updating record:', err));
+    }
+
+    function resetRecord() {
+        if (confirm('Are you sure you want to reset this deck\'s record to 0-0-0?')) {
+            fetch(`/deck/{{ deck.id }}/record/reset`, {
+                method: 'POST'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('wins-display').innerText = 0;
+                    document.getElementById('losses-display').innerText = 0;
+                    document.getElementById('draws-display').innerText = 0;
+                    document.getElementById('winrate-display').innerText = '-';
+                    document.getElementById('total-display').innerText = '0 Matches';
+                } else {
+                    alert(data.error || 'Failed to reset record');
+                }
+            })
+            .catch(err => console.error('Error resetting record:', err));
+        }
+    }
 
     // Playtest Simulator Script
     let deckCards = [];

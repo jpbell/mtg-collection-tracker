@@ -155,6 +155,9 @@ class Deck(db.Model):
     format = db.Column(db.String(50), default='Standard')
     is_legal = db.Column(db.Boolean, default=True, server_default='1')
     precon_file = db.Column(db.String(255), nullable=True)
+    wins = db.Column(db.Integer, default=0, nullable=False, server_default='0')
+    losses = db.Column(db.Integer, default=0, nullable=False, server_default='0')
+    draws = db.Column(db.Integer, default=0, nullable=False, server_default='0')
     cards = db.relationship('DeckCard', backref='deck', cascade='all, delete-orphan')
 
 class DeckCard(db.Model):
@@ -298,6 +301,24 @@ def upgrade_database_schema():
                         conn.execute(db.text("ALTER TABLE deck ADD COLUMN precon_file VARCHAR(255)"))
                 except Exception as e:
                     print(f"Failed to alter table deck to add precon_file: {e}")
+            if table == 'deck' and 'wins' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE deck ADD COLUMN wins INTEGER DEFAULT 0"))
+                except Exception as e:
+                    print(f"Failed to alter table deck to add wins: {e}")
+            if table == 'deck' and 'losses' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE deck ADD COLUMN losses INTEGER DEFAULT 0"))
+                except Exception as e:
+                    print(f"Failed to alter table deck to add losses: {e}")
+            if table == 'deck' and 'draws' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE deck ADD COLUMN draws INTEGER DEFAULT 0"))
+                except Exception as e:
+                    print(f"Failed to alter table deck to add draws: {e}")
 
     # Create showcase_comment table if not present
     if not inspector.has_table('showcase_comment'):
@@ -2252,6 +2273,50 @@ def toggle_commander(deck_id, deck_card_id):
     status = "designated as Commander" if dc.is_commander else "removed from Commander designation"
     flash(f"Updated: {dc.card.name} is now {status}.", "success")
     return redirect(url_for('view_deck', deck_id=deck_id))
+
+@app.route('/deck/<int:deck_id>/record/update', methods=['POST'])
+def update_deck_record(deck_id):
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
+    data = request.get_json() or {}
+    field = data.get('field')
+    amount = data.get('amount', 0)
+    
+    if field not in ['wins', 'losses', 'draws']:
+        return jsonify({'success': False, 'error': 'Invalid field'}), 400
+        
+    current_val = getattr(deck, field, 0) or 0
+    new_val = max(0, current_val + amount)
+    setattr(deck, field, new_val)
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'wins': deck.wins,
+            'losses': deck.losses,
+            'draws': deck.draws
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/deck/<int:deck_id>/record/reset', methods=['POST'])
+def reset_deck_record(deck_id):
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
+    deck.wins = 0
+    deck.losses = 0
+    deck.draws = 0
+    try:
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'wins': 0,
+            'losses': 0,
+            'draws': 0
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/deck/delete/<int:deck_id>')
 def delete_deck(deck_id):
