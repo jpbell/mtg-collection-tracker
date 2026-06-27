@@ -19,6 +19,8 @@ passcode.txt
 # Local Caches & Generated Metadata
 *cache.json
 price_update_metadata.json
+audit_metadata.json
+precon_cache/
 
 # IDE settings
 .vscode/

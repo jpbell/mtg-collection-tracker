@@ -154,6 +154,7 @@ class Deck(db.Model):
     description = db.Column(db.String(255))
     format = db.Column(db.String(50), default='Standard')
     is_legal = db.Column(db.Boolean, default=True, server_default='1')
+    precon_file = db.Column(db.String(255), nullable=True)
     cards = db.relationship('DeckCard', backref='deck', cascade='all, delete-orphan')
 
 class DeckCard(db.Model):
@@ -291,6 +292,12 @@ def upgrade_database_schema():
                         conn.execute(db.text("ALTER TABLE deck ADD COLUMN is_legal BOOLEAN DEFAULT 1"))
                 except Exception as e:
                     print(f"Failed to alter table deck to add is_legal: {e}")
+            if table == 'deck' and 'precon_file' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE deck ADD COLUMN precon_file VARCHAR(255)"))
+                except Exception as e:
+                    print(f"Failed to alter table deck to add precon_file: {e}")
 
     # Create showcase_comment table if not present
     if not inspector.has_table('showcase_comment'):
@@ -759,6 +766,38 @@ def audit_decks_task(app_instance):
         print("Audit background task exception:", e)
     finally:
         AUDIT_STATUS['in_progress'] = False
+
+def get_precon_data(file_name):
+    precon_cache_dir = os.path.join(basedir, 'precon_cache')
+    cache_path = os.path.join(precon_cache_dir, f"{file_name}.json")
+    
+    # 1. Try local cache
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+            
+    # 2. Dynamic download fallback
+    url = f"https://mtgjson.com/api/v5/decks/{file_name}.json"
+    try:
+        res = requests.get(url, headers={'User-Agent': 'MTGTracker/1.0'}, timeout=10)
+        if res.status_code == 200:
+            deck_data = res.json().get('data', {})
+            if deck_data:
+                # Save cache
+                os.makedirs(precon_cache_dir, exist_ok=True)
+                try:
+                    with open(cache_path, 'w') as f:
+                        json.dump(deck_data, f)
+                except Exception:
+                    pass
+                return deck_data
+    except Exception:
+        pass
+        
+    return None
 
 def get_set_total_cards(set_code):
     set_code = set_code.lower()
@@ -1938,6 +1977,57 @@ def view_deck(deck_id):
         db.session.commit()
         
     illegal_card_names = {item['name'] for item in illegal_cards}
+    
+    # Precon diff logic
+    precon_diff = None
+    if deck.precon_file:
+        precon_data = get_precon_data(deck.precon_file)
+        if precon_data:
+            original_counts = {}
+            for c in precon_data.get('commander', []):
+                name = c.get('name')
+                count = c.get('count', 1)
+                if name:
+                    original_counts[name] = original_counts.get(name, 0) + count
+            for c in precon_data.get('mainBoard', []):
+                name = c.get('name')
+                count = c.get('count', 1)
+                if name:
+                    original_counts[name] = original_counts.get(name, 0) + count
+            
+            current_counts = {}
+            for dc in deck.cards:
+                if dc.card:
+                    name = dc.card.name
+                    current_counts[name] = current_counts.get(name, 0) + dc.quantity
+            
+            additions = []
+            removals = []
+            total_original = sum(original_counts.values())
+            
+            all_names = set(original_counts.keys()).union(set(current_counts.keys()))
+            for name in all_names:
+                orig_qty = original_counts.get(name, 0)
+                curr_qty = current_counts.get(name, 0)
+                diff = curr_qty - orig_qty
+                if diff > 0:
+                    additions.append({'name': name, 'quantity': diff})
+                elif diff < 0:
+                    removals.append({'name': name, 'quantity': abs(diff)})
+            
+            additions.sort(key=lambda x: x['name'])
+            removals.sort(key=lambda x: x['name'])
+            
+            upgraded_count = sum(item['quantity'] for item in additions)
+            upgrade_pct = round((upgraded_count / total_original * 100), 1) if total_original > 0 else 0.0
+            
+            precon_diff = {
+                'additions': additions,
+                'removals': removals,
+                'total_original': total_original,
+                'upgraded_count': upgraded_count,
+                'upgrade_pct': upgrade_pct
+            }
                 
     return render_template('deck_detail.html', 
                            deck=deck, 
@@ -1949,7 +2039,8 @@ def view_deck(deck_id):
                            type_counts=type_counts,
                            deck_cards_list=deck_cards_list,
                            illegal_cards=illegal_cards,
-                           illegal_card_names=list(illegal_card_names))
+                           illegal_card_names=list(illegal_card_names),
+                           precon_diff=precon_diff)
 
 @app.route('/deck/<int:deck_id>/add', methods=['POST'])
 def add_to_deck(deck_id):
@@ -2345,9 +2436,9 @@ def parse_decklist_text(text):
                 
     return cards_list
 
-def process_imported_cards(deck_name, format_name, description, raw_cards):
+def process_imported_cards(deck_name, format_name, description, raw_cards, precon_file=None):
     # Create the new Deck
-    deck = Deck(name=deck_name, description=description, format=format_name, user_id=session.get('user_id'))
+    deck = Deck(name=deck_name, description=description, format=format_name, user_id=session.get('user_id'), precon_file=precon_file)
     db.session.add(deck)
     db.session.commit() # Save deck to get deck.id
     
@@ -2546,7 +2637,17 @@ def import_precon():
                 'is_commander': False
             })
             
-        deck_id = process_imported_cards(deck_name, deck_format, f"Preconstructed deck {deck_name} imported from MTGJSON.", raw_cards)
+        # Cache the precon JSON data locally
+        precon_cache_dir = os.path.join(basedir, 'precon_cache')
+        os.makedirs(precon_cache_dir, exist_ok=True)
+        cache_path = os.path.join(precon_cache_dir, f"{file_name}.json")
+        try:
+            with open(cache_path, 'w') as f:
+                json.dump(deck_data, f)
+        except Exception as ce:
+            print("Failed to cache precon JSON locally:", ce)
+
+        deck_id = process_imported_cards(deck_name, deck_format, f"Preconstructed deck {deck_name} imported from MTGJSON.", raw_cards, precon_file=file_name)
         
         if deck_id:
             flash(f"Successfully imported precon '{deck_name}' with {len(raw_cards)} cards into your decks and collection!", "success")
@@ -2594,6 +2695,49 @@ def import_text_decklist():
         flash(f"Error importing custom deck: {str(e)}", "error")
         
     return redirect(url_for('import_deck_view'))
+
+@app.route('/deck/<int:deck_id>/update_precon', methods=['POST'])
+def update_deck_precon(deck_id):
+    deck = scoped(Deck).filter_by(id=deck_id).first_or_404()
+    precon_file = request.form.get('precon_file', '').strip() or None
+    deck.precon_file = precon_file
+    db.session.commit()
+    if precon_file:
+        flash(f"Associated deck with precon template '{precon_file}'!", "success")
+    else:
+        flash("Unlinked precon template from deck.", "info")
+    return redirect(url_for('view_deck', deck_id=deck_id))
+
+@app.route('/api/precons')
+def get_precons_list_api():
+    cache_file = os.path.join(basedir, 'precons_list_cache.json')
+    refresh = True
+    if os.path.exists(cache_file):
+        try:
+            mtime = os.path.getmtime(cache_file)
+            if time.time() - mtime < 86400: # 1 day
+                refresh = False
+        except Exception:
+            pass
+            
+    if refresh:
+        try:
+            res = requests.get('https://mtgjson.com/api/v5/DeckList.json', headers={'User-Agent': 'MTGTracker/1.0'}, timeout=5)
+            if res.status_code == 200:
+                with open(cache_file, 'w') as f:
+                    json.dump(res.json().get('data', []), f)
+        except Exception as e:
+            print("Failed to fetch MTGJSON deck list for API:", e)
+            
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r') as f:
+                data = json.load(f)
+                return jsonify(data)
+        except Exception:
+            pass
+            
+    return jsonify([])
 
 # --- Token Tracker Helpers ---
 _sets_cache = None
