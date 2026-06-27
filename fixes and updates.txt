@@ -1,0 +1,8 @@
+1. implement 1-week price history
+2. allow changing views of the careds, IE: list, card preview, preview only (no detail), etc
+3. Investigate Promo cards
+4. progress bar for refreshing price, auto refresh on first log in for the day
+5. show value gain or loss on indiviual cards on main screen, pop up, and detailed view
+when adding cards, if it is a duplicat, make it move to the top of the list, like new cards do
+6. allow the tracking of cards on a single day, from day to day
+7. card scanning.....

@@ -284,15 +284,17 @@
     <div class="guide-card">
         <div>
             <div class="guide-icon">⚜️</div>
-            <h3 class="guide-title">Elite Showcase</h3>
+            <h3 class="guide-title">Elite Showcase & Directory</h3>
         </div>
         <p class="guide-body">
-            Share your most prestigious cards publicly with friends and the MTG community.
+            Share your most prestigious cards publicly with friends and the MTG community. Browse every collector's showcase from the public directory.
         </p>
         <ul class="guide-list">
+            <li><strong>Showcase Directory</strong>: Visit <span class="code-span">/showcases</span> to browse every user's Elite Showcase ranked by total collection value. Each card shows the collector's top card art, value, card count, and live comment count.</li>
             <li><strong>Automated Top 10 Rankings</strong>: The public showcase page (<span class="code-span">/showcase</span>) dynamically identifies and displays the top 10 most valuable cards in your entire collection sorted by current price.</li>
             <li><strong>Auto-Eviction Mechanics</strong>: As you summon new cards or card values fluctuate, the database automatically recalibrates rankings, evicting lower-valued cards to keep the Top 10 completely real-time.</li>
             <li><strong>Anonymized Public Sharing</strong>: The showcase is exempted from vault passcodes. Anyone with the URL can view it, but private management routes (summon, edit, delete, decks, wishlist, and settings) remain completely hidden and locked.</li>
+            <li><strong>Comments</strong>: Any visitor can leave a comment on a showcase page. Logged-in users post under their vault username; guests may optionally enter a display name. The showcase owner and any comment's author can delete their own comments.</li>
             <li><strong>Copy Share Link</strong>: Click the **🔗 Copy Share Link** button to copy the showcase URL directly to your clipboard.</li>
             <li><strong>Milestone XP Progress</strong>: Visual XP-style progress bar showing how close your Top 10 collection value is to major milestones ($100, $500, $1000, etc.).</li>
             <li><strong>3D Tilt & Foil Shimmer</strong>: Showcase cards tilt dynamically based on cursor position. Foil prints shimmer with mouse-responsive holographic sheen shifts.</li>
@@ -304,10 +306,13 @@
     <div class="guide-card">
         <div>
             <div class="guide-icon">📷</div>
-            <h3 class="guide-title">Card Scanner & Updates</h3>
+            <h3 class="guide-title">Card Scanner &amp; Updates <span style="font-size: 0.55rem; background: #f59e0b; color: #000; padding: 2px 7px; border-radius: 4px; font-family: sans-serif; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; vertical-align: middle; margin-left: 4px;">OCR Beta</span></h3>
         </div>
         <p class="guide-body">
             Scan physical cards into your collection and manage codebase updates.
+        </p>
+        <p class="guide-body" style="font-size: 0.82rem; background: rgba(245,158,11,0.1); border-left: 3px solid #f59e0b; padding: 8px 12px; border-radius: 0 6px 6px 0; color: #f59e0b; margin-top: -4px;">
+            ⚠️ <strong>OCR scanning is currently in beta.</strong> Accuracy may vary depending on card lighting, image quality, and card style (e.g. foil, borderless, or non-English cards). Use the manual search bar to correct any misread titles.
         </p>
         <ul class="guide-list">
             <li><strong>OCR Title Scanner</strong>: Hold your card up to your webcam or upload a photo to scan it. The system crops and upscales the title area by 2x for high OCR precision.</li>

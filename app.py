@@ -30,9 +30,9 @@ def scoped(model):
 
 @app.before_request
 def check_auth():
-    # Allow access to login route, register route, public showcase, and static files
+    # Allow access to login route, register route, public showcase(s), and static files
     path = request.path
-    if path in ['/login', '/register'] or path.startswith('/showcase') or path.startswith('/static/'):
+    if path in ['/login', '/register', '/showcases'] or path.startswith('/showcase') or path.startswith('/static/'):
         return
     
     # If no users exist, redirect to registration/setup
@@ -176,6 +176,17 @@ class WishlistCard(db.Model):
     is_foil = db.Column(db.Boolean, default=False, server_default='0')
     quantity = db.Column(db.Integer, default=1)
 
+class ShowcaseComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    showcase_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    author_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # NULL = anonymous
+    author_name = db.Column(db.String(80), nullable=False, default='Anonymous')
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    showcase_user = db.relationship('User', foreign_keys=[showcase_user_id])
+    author_user  = db.relationship('User', foreign_keys=[author_user_id])
+
 def upgrade_database_schema():
     db.create_all()
     inspector = db.inspect(db.engine)
@@ -240,6 +251,22 @@ def upgrade_database_schema():
                 except Exception as e:
                     print(f"Failed to alter table card to add promo_types: {e}")
 
+    # Create showcase_comment table if not present
+    if not inspector.has_table('showcase_comment'):
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(db.text("""
+                    CREATE TABLE showcase_comment (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        showcase_user_id INTEGER NOT NULL REFERENCES user(id),
+                        author_user_id INTEGER REFERENCES user(id),
+                        author_name VARCHAR(80) NOT NULL DEFAULT 'Anonymous',
+                        body TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+        except Exception as e:
+            print(f"Failed to create showcase_comment table: {e}")
 
 
 with app.app_context():
@@ -2871,6 +2898,35 @@ def trigger_update():
             'message': f"Failed to perform update: {str(e)}"
         }), 500
 
+@app.route('/showcases')
+def showcase_index():
+    """Public index listing every user's showcase with preview stats."""
+    users = User.query.order_by(User.id).all()
+    showcases = []
+    for u in users:
+        all_cards = Card.query.filter_by(user_id=u.id).all()
+        total_val = sum((c.price or 0.0) * c.quantity for c in all_cards)
+        card_count = sum(c.quantity for c in all_cards)
+        vintage_top = Card.query.filter(
+            Card.user_id == u.id,
+            Card.is_vintage == True,
+            Card.released_at < '2003-07-28'
+        ).order_by(Card.price.desc()).first()
+        modern_top = Card.query.filter_by(user_id=u.id, is_modern=True).order_by(Card.price.desc()).first()
+        top_card = vintage_top or modern_top
+        comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id).count()
+        showcases.append({
+            'user': u,
+            'total_value': total_val,
+            'card_count': card_count,
+            'top_card': top_card,
+            'comment_count': comment_count,
+        })
+    # Sort by total value descending
+    showcases.sort(key=lambda x: x['total_value'], reverse=True)
+    return render_template('showcase_index.html', showcases=showcases)
+
+
 @app.route('/showcase')
 @app.route('/showcase/<username>')
 def view_showcase(username=None):
@@ -2901,6 +2957,8 @@ def view_showcase(username=None):
     concentration = 0.0
     if total_collection_val > 0:
         concentration = (total_value / total_collection_val) * 100
+
+    comments = ShowcaseComment.query.filter_by(showcase_user_id=user.id).order_by(ShowcaseComment.created_at.desc()).all()
         
     return render_template('showcase.html', 
                            vintage_cards=vintage_cards,
@@ -2908,7 +2966,57 @@ def view_showcase(username=None):
                            total_value=total_value, 
                            total_qty=total_qty, 
                            concentration=concentration,
-                           showcase_user=user)
+                           showcase_user=user,
+                           comments=comments)
+
+
+@app.route('/showcase/<username>/comment', methods=['POST'])
+def post_showcase_comment(username):
+    showcase_user = User.query.filter_by(username=username).first_or_404()
+    body = (request.form.get('body') or '').strip()
+    if not body:
+        flash('Comment cannot be empty.', 'error')
+        return redirect(url_for('view_showcase', username=username))
+    if len(body) > 1000:
+        flash('Comment is too long (max 1000 characters).', 'error')
+        return redirect(url_for('view_showcase', username=username))
+
+    if session.get('user_id'):
+        author = User.query.get(session['user_id'])
+        author_name = author.username if author else 'Anonymous'
+        author_id = session['user_id']
+    else:
+        raw_name = (request.form.get('author_name') or '').strip()
+        author_name = raw_name[:80] if raw_name else 'Anonymous'
+        author_id = None
+
+    comment = ShowcaseComment(
+        showcase_user_id=showcase_user.id,
+        author_user_id=author_id,
+        author_name=author_name,
+        body=body
+    )
+    db.session.add(comment)
+    db.session.commit()
+    flash('Comment posted!', 'success')
+    return redirect(url_for('view_showcase', username=username) + '#comments')
+
+
+@app.route('/showcase/<username>/comment/<int:comment_id>/delete', methods=['POST'])
+def delete_showcase_comment(username, comment_id):
+    """Delete a comment — allowed by the showcase owner or the comment author."""
+    comment = ShowcaseComment.query.get_or_404(comment_id)
+    showcase_user = User.query.filter_by(username=username).first_or_404()
+    uid = session.get('user_id')
+    if not uid:
+        abort(403)
+    # Only the showcase owner OR the comment's author may delete it
+    if uid != showcase_user.id and uid != comment.author_user_id:
+        abort(403)
+    db.session.delete(comment)
+    db.session.commit()
+    flash('Comment removed.', 'success')
+    return redirect(url_for('view_showcase', username=username) + '#comments')
 
 
 if __name__ == '__main__': app.run(host='0.0.0.0', debug=True)
