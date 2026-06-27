@@ -1372,6 +1372,8 @@
             <button type="submit" class="comment-submit-btn">Post Comment</button>
             {% if session.get('user_id') %}
             <span style="font-size: 0.78rem; color: var(--text-muted); margin-left: 12px;">Posting as <strong style="color: var(--accent-cyan);">{{ session.get('username') }}</strong></span>
+            {% else %}
+            <span style="font-size: 0.78rem; color: var(--accent-gold); margin-left: 12px; -webkit-text-fill-color: var(--accent-gold);">ℹ️ Guest comments require approval by the site admin before appearing.</span>
             {% endif %}
         </form>
     </div>
