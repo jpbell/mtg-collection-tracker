@@ -153,6 +153,7 @@ class Deck(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(255))
     format = db.Column(db.String(50), default='Standard')
+    is_legal = db.Column(db.Boolean, default=True, server_default='1')
     cards = db.relationship('DeckCard', backref='deck', cascade='all, delete-orphan')
 
 class DeckCard(db.Model):
@@ -163,6 +164,18 @@ class DeckCard(db.Model):
     is_commander = db.Column(db.Boolean, default=False, nullable=False, server_default='0')
     
     card = db.relationship('Card')
+
+class CardLegality(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    card_name = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    standard = db.Column(db.String(20), default='legal')
+    modern = db.Column(db.String(20), default='legal')
+    commander = db.Column(db.String(20), default='legal')
+    pioneer = db.Column(db.String(20), default='legal')
+    legacy = db.Column(db.String(20), default='legal')
+    pauper = db.Column(db.String(20), default='legal')
+    vintage = db.Column(db.String(20), default='legal')
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Token(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -272,6 +285,12 @@ def upgrade_database_schema():
                         conn.execute(db.text("ALTER TABLE card ADD COLUMN promo_types VARCHAR(255)"))
                 except Exception as e:
                     print(f"Failed to alter table card to add promo_types: {e}")
+            if table == 'deck' and 'is_legal' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE deck ADD COLUMN is_legal BOOLEAN DEFAULT 1"))
+                except Exception as e:
+                    print(f"Failed to alter table deck to add is_legal: {e}")
 
     # Create showcase_comment table if not present
     if not inspector.has_table('showcase_comment'):
@@ -565,6 +584,181 @@ def get_last_price_update_time():
         except Exception:
             pass
     return None
+
+AUDIT_METADATA_FILE = os.path.join(basedir, 'audit_metadata.json')
+
+# Global Status of Legality Auditing
+AUDIT_STATUS = {
+    'in_progress': False,
+    'last_run': None,
+    'message': '',
+    'progress': 0,
+    'total': 0
+}
+
+def save_last_audit_time(last_run_time):
+    data = {
+        'last_audited': last_run_time
+    }
+    try:
+        with open(AUDIT_METADATA_FILE, 'w') as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+def get_last_audit_time():
+    if os.path.exists(AUDIT_METADATA_FILE):
+        try:
+            with open(AUDIT_METADATA_FILE, 'r') as f:
+                data = json.load(f)
+                return data.get('last_audited')
+        except Exception:
+            pass
+    return None
+
+def format_audit_time_string(iso_str):
+    if not iso_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return dt.strftime("%b %d, %Y, %I:%M %p")
+    except Exception:
+        return iso_str
+
+def audit_decks_task(app_instance):
+    import threading
+    global AUDIT_STATUS
+    AUDIT_STATUS['in_progress'] = True
+    AUDIT_STATUS['progress'] = 0
+    AUDIT_STATUS['message'] = 'Initializing legality audit...'
+    AUDIT_STATUS['total'] = 0
+    
+    try:
+        with app_instance.app_context():
+            # Get all unique cards currently in any deck
+            deck_cards = db.session.query(Card.name, Card.set_code, Card.collector_number)\
+                .join(DeckCard, DeckCard.card_id == Card.id)\
+                .distinct().all()
+            
+            total_cards = len(deck_cards)
+            AUDIT_STATUS['total'] = total_cards
+            AUDIT_STATUS['message'] = f'Found {total_cards} unique cards. Querying Scryfall...'
+            
+            chunk_size = 75
+            formats = ['standard', 'modern', 'commander', 'pioneer', 'legacy', 'pauper', 'vintage']
+            basic_lands = ['mountain', 'forest', 'plains', 'island', 'swamp', 'waste']
+            
+            for i in range(0, total_cards, chunk_size):
+                chunk = deck_cards[i:i+chunk_size]
+                identifiers = []
+                
+                # Check for basic lands in this chunk to handle them immediately
+                for name, set_code, collector_number in chunk:
+                    if name.lower() in basic_lands:
+                        continue
+                    identifiers.append({
+                        "set": set_code.lower(),
+                        "collector_number": str(collector_number).lower()
+                    })
+                
+                if identifiers:
+                    try:
+                        res = requests.post(
+                            'https://api.scryfall.com/cards/collection',
+                            json={'identifiers': identifiers},
+                            headers={'User-Agent': 'MTGTracker/1.0'},
+                            timeout=15
+                        )
+                        if res.status_code == 200:
+                            scry_cards = res.json().get('data', [])
+                            for sc in scry_cards:
+                                name = sc.get('name')
+                                legalities = sc.get('legalities', {})
+                                if name:
+                                    leg_entry = CardLegality.query.filter_by(card_name=name).first()
+                                    if not leg_entry:
+                                        leg_entry = CardLegality(card_name=name)
+                                        db.session.add(leg_entry)
+                                    
+                                    leg_entry.standard = legalities.get('standard', 'not_legal')
+                                    leg_entry.modern = legalities.get('modern', 'not_legal')
+                                    leg_entry.commander = legalities.get('commander', 'not_legal')
+                                    leg_entry.pioneer = legalities.get('pioneer', 'not_legal')
+                                    leg_entry.legacy = legalities.get('legacy', 'not_legal')
+                                    leg_entry.pauper = legalities.get('pauper', 'not_legal')
+                                    leg_entry.vintage = legalities.get('vintage', 'not_legal')
+                                    leg_entry.last_updated = datetime.utcnow()
+                            db.session.commit()
+                    except Exception as ex:
+                        print("Scryfall bulk query failed in audit:", ex)
+                    time.sleep(0.1) # respect Scryfall rate limit
+                
+                # Handle basic lands
+                for name, _, _ in chunk:
+                    if name.lower() in basic_lands:
+                        leg_entry = CardLegality.query.filter_by(card_name=name).first()
+                        if not leg_entry:
+                            leg_entry = CardLegality(card_name=name)
+                            db.session.add(leg_entry)
+                        for fmt in formats:
+                            setattr(leg_entry, fmt, 'legal')
+                        leg_entry.last_updated = datetime.utcnow()
+                        db.session.commit()
+                
+                AUDIT_STATUS['progress'] = min(i + chunk_size, total_cards)
+                AUDIT_STATUS['message'] = f'Updated {AUDIT_STATUS["progress"]} of {total_cards} card legalities...'
+            
+            # Now scan all saved decks
+            AUDIT_STATUS['message'] = 'Scanning decks against updated index...'
+            all_decks = Deck.query.all()
+            for d in all_decks:
+                deck_is_legal = True
+                format_key = d.format.lower()
+                if 'commander' in format_key:
+                    format_key = 'commander'
+                
+                for dc in d.cards:
+                    if not dc.card:
+                        continue
+                    
+                    leg_entry = CardLegality.query.filter_by(card_name=dc.card.name).first()
+                    if leg_entry:
+                        card_legality = getattr(leg_entry, format_key, 'not_legal')
+                    else:
+                        card_legality = 'legal'
+                    
+                    if card_legality in ['not_legal', 'banned']:
+                        deck_is_legal = False
+                        break
+                        
+                    if format_key == 'vintage' and card_legality == 'restricted':
+                        if dc.quantity > 1:
+                            deck_is_legal = False
+                            break
+                            
+                    is_basic = dc.card.name.lower() in basic_lands
+                    if not is_basic:
+                        max_allowed = 4
+                        if format_key == 'commander':
+                            max_allowed = 1
+                        if dc.quantity > max_allowed:
+                            deck_is_legal = False
+                            break
+                            
+                d.is_legal = deck_is_legal
+            
+            db.session.commit()
+            
+            now_str = datetime.now().isoformat()
+            AUDIT_STATUS['message'] = 'Audit completed successfully!'
+            AUDIT_STATUS['last_run'] = now_str
+            save_last_audit_time(now_str)
+            
+    except Exception as e:
+        AUDIT_STATUS['message'] = f'Audit failed: {str(e)}'
+        print("Audit background task exception:", e)
+    finally:
+        AUDIT_STATUS['in_progress'] = False
 
 def get_set_total_cards(set_code):
     set_code = set_code.lower()
@@ -1562,13 +1756,17 @@ def list_decks():
             if dc.card:
                 total_cards += dc.quantity
                 total_value += (dc.card.price or 0.0) * dc.quantity
+                
+    last_audited = get_last_audit_time()
+    formatted_last_audited = format_audit_time_string(last_audited)
             
     return render_template('decks.html', 
                            decks=decks, 
                            total_decks=total_decks,
                            total_cards=total_cards,
                            total_value=round(total_value, 2),
-                           format_counts=format_counts)
+                           format_counts=format_counts,
+                           last_audited=formatted_last_audited)
 
 @app.route('/deck/create', methods=['POST'])
 def create_deck():
@@ -1583,6 +1781,25 @@ def create_deck():
     else:
         flash("Deck name cannot be empty.", "error")
     return redirect(url_for('list_decks'))
+
+@app.route('/decks/audit', methods=['POST'])
+def audit_decks_route():
+    import threading
+    global AUDIT_STATUS
+    
+    if AUDIT_STATUS['in_progress']:
+        return jsonify({'status': 'in_progress', 'message': 'Audit already in progress.'})
+        
+    thread = threading.Thread(target=audit_decks_task, args=(app,))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'status': 'started', 'message': 'Audit background job started.'})
+
+@app.route('/decks/audit/status')
+def audit_decks_status_route():
+    global AUDIT_STATUS
+    return jsonify(AUDIT_STATUS)
 
 @app.route('/deck/<int:deck_id>')
 def view_deck(deck_id):
@@ -1672,6 +1889,56 @@ def view_deck(deck_id):
             if pips > 0:
                 color_pips[key] += pips * qty
                 
+    # Legality check using CardLegality cache
+    format_key = deck.format.lower()
+    if 'commander' in format_key:
+        format_key = 'commander'
+        
+    illegal_cards = []
+    card_names = [dc.card.name for dc in deck.cards if dc.card]
+    legalities = {}
+    if card_names:
+        leg_entries = CardLegality.query.filter(CardLegality.card_name.in_(card_names)).all()
+        legalities = {entry.card_name: getattr(entry, format_key, 'legal') for entry in leg_entries}
+        
+    basic_lands = ['mountain', 'forest', 'plains', 'island', 'swamp', 'waste']
+    deck_is_legal = True
+    
+    for dc in deck.cards:
+        if not dc.card:
+            continue
+        c_leg = legalities.get(dc.card.name, 'legal')
+        
+        is_card_illegal = False
+        reason = ""
+        
+        if c_leg in ['not_legal', 'banned']:
+            is_card_illegal = True
+            reason = f"Banned or not legal in {deck.format}"
+        elif format_key == 'vintage' and c_leg == 'restricted' and dc.quantity > 1:
+            is_card_illegal = True
+            reason = "Restricted in Vintage (maximum 1 copy allowed)"
+        elif dc.card.name.lower() not in basic_lands:
+            max_allowed = 4
+            if format_key == 'commander':
+                max_allowed = 1
+            if dc.quantity > max_allowed:
+                is_card_illegal = True
+                reason = f"Exceeds copy limit (maximum {max_allowed} allowed, you have {dc.quantity})"
+                
+        if is_card_illegal:
+            deck_is_legal = False
+            illegal_cards.append({
+                'name': dc.card.name,
+                'reason': reason
+            })
+            
+    if deck.is_legal != deck_is_legal:
+        deck.is_legal = deck_is_legal
+        db.session.commit()
+        
+    illegal_card_names = {item['name'] for item in illegal_cards}
+                
     return render_template('deck_detail.html', 
                            deck=deck, 
                            total_cards=total_cards, 
@@ -1680,7 +1947,9 @@ def view_deck(deck_id):
                            cmc_distribution=cmc_distribution,
                            color_pips=color_pips,
                            type_counts=type_counts,
-                           deck_cards_list=deck_cards_list)
+                           deck_cards_list=deck_cards_list,
+                           illegal_cards=illegal_cards,
+                           illegal_card_names=list(illegal_card_names))
 
 @app.route('/deck/<int:deck_id>/add', methods=['POST'])
 def add_to_deck(deck_id):
@@ -1699,18 +1968,43 @@ def add_to_deck(deck_id):
     is_restricted = False
     
     if not is_basic_land:
-        url = f"https://api.scryfall.com/cards/{collection_card.set_code.lower()}/{collection_card.collector_number}"
-        try:
-            res = requests.get(url, headers={"User-Agent": "MTGTracker/1.0"}, timeout=5)
-            if res.status_code == 200:
-                d = res.json()
-                legality = d.get('legalities', {}).get(format_key, 'not_legal')
-                if legality == 'not_legal' or legality == 'banned':
-                    is_legal = False
-                elif legality == 'restricted':
-                    is_restricted = True
-        except Exception:
-            flash("Warning: Could not verify card legality with Scryfall (API offline).", "info")
+        # Check cache first
+        leg_entry = CardLegality.query.filter_by(card_name=collection_card.name).first()
+        if leg_entry:
+            legality = getattr(leg_entry, format_key, 'not_legal')
+            if legality in ['not_legal', 'banned']:
+                is_legal = False
+            elif legality == 'restricted':
+                is_restricted = True
+        else:
+            url = f"https://api.scryfall.com/cards/{collection_card.set_code.lower()}/{collection_card.collector_number}"
+            try:
+                res = requests.get(url, headers={"User-Agent": "MTGTracker/1.0"}, timeout=5)
+                if res.status_code == 200:
+                    d = res.json()
+                    legalities = d.get('legalities', {})
+                    legality = legalities.get(format_key, 'not_legal')
+                    if legality in ['not_legal', 'banned']:
+                        is_legal = False
+                    elif legality == 'restricted':
+                        is_restricted = True
+                    
+                    # Update cache
+                    leg_entry = CardLegality(
+                        card_name=collection_card.name,
+                        standard=legalities.get('standard', 'not_legal'),
+                        modern=legalities.get('modern', 'not_legal'),
+                        commander=legalities.get('commander', 'not_legal'),
+                        pioneer=legalities.get('pioneer', 'not_legal'),
+                        legacy=legalities.get('legacy', 'not_legal'),
+                        pauper=legalities.get('pauper', 'not_legal'),
+                        vintage=legalities.get('vintage', 'not_legal'),
+                        last_updated=datetime.utcnow()
+                    )
+                    db.session.add(leg_entry)
+                    db.session.commit()
+            except Exception:
+                flash("Warning: Could not verify card legality with Scryfall (API offline).", "info")
             
     if not is_legal:
         flash(f"Cannot add {collection_card.name}: It is BANNED or NOT LEGAL in {deck.format}!", "error")
@@ -1780,16 +2074,38 @@ def update_deck_card_quantity(deck_id, deck_card_id, action):
         if deck.format == 'Commander':
             max_allowed = 1
         elif deck.format == 'Vintage':
-            # Check restricted status via Scryfall
-            url = f"https://api.scryfall.com/cards/{collection_card.set_code.lower()}/{collection_card.collector_number}"
-            try:
-                res = requests.get(url, headers={"User-Agent": "MTGTracker/1.0"}, timeout=5)
-                if res.status_code == 200:
-                    d = res.json()
-                    if d.get('legalities', {}).get('vintage') == 'restricted':
-                        max_allowed = 1
-            except Exception:
-                pass
+            # Check restricted status via cache first
+            leg_entry = CardLegality.query.filter_by(card_name=collection_card.name).first()
+            if leg_entry:
+                if leg_entry.vintage == 'restricted':
+                    max_allowed = 1
+            else:
+                # Check restricted status via Scryfall
+                url = f"https://api.scryfall.com/cards/{collection_card.set_code.lower()}/{collection_card.collector_number}"
+                try:
+                    res = requests.get(url, headers={"User-Agent": "MTGTracker/1.0"}, timeout=5)
+                    if res.status_code == 200:
+                        d = res.json()
+                        legalities = d.get('legalities', {})
+                        if legalities.get('vintage') == 'restricted':
+                            max_allowed = 1
+                        
+                        # Populate cache
+                        leg_entry = CardLegality(
+                            card_name=collection_card.name,
+                            standard=legalities.get('standard', 'not_legal'),
+                            modern=legalities.get('modern', 'not_legal'),
+                            commander=legalities.get('commander', 'not_legal'),
+                            pioneer=legalities.get('pioneer', 'not_legal'),
+                            legacy=legalities.get('legacy', 'not_legal'),
+                            pauper=legalities.get('pauper', 'not_legal'),
+                            vintage=legalities.get('vintage', 'not_legal'),
+                            last_updated=datetime.utcnow()
+                        )
+                        db.session.add(leg_entry)
+                        db.session.commit()
+                except Exception:
+                    pass
                 
         if not is_basic_land and dc.quantity >= max_allowed:
             flash(f"Cannot increase. {collection_card.name} is limited to a MAXIMUM of {max_allowed} copies in {deck.format}.", "error")

@@ -400,6 +400,24 @@
     {% endif %}
 {% endif %}
 
+{% if illegal_cards %}
+    <div class="legality-banner" style="margin-bottom: 24px; padding: 14px 20px; border-radius: 12px; background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.2); color: var(--accent-rose); display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: middle;">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+            </svg>
+            <span style="font-weight: 700; vertical-align: middle;">Deck is ILLEGAL for {{ deck.format }} format!</span>
+        </div>
+        <div style="font-size: 0.9rem; padding-left: 28px;">
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.5; list-style-type: square;">
+                {% for item in illegal_cards %}
+                    <li><strong>{{ item.name }}</strong>: {{ item.reason }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endif %}
+
 <div class="legality-banner" style="margin-bottom: 24px; padding: 14px 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;
     {% if is_deck_size_legal %}
         background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--accent-green);
@@ -590,6 +608,7 @@
         {% for dc in deck.cards %}
             {% if dc.card %}
                 <div class="deck-card-item{% if dc.card.is_foil %} foil-overlay-mini{% endif %}"
+                     style="{% if dc.card.name in illegal_card_names %}border-color: var(--accent-rose); background: rgba(244, 63, 94, 0.03);{% endif %}"
                      data-name="{{ dc.card.name }}"
                      data-set="{{ dc.card.set_code }}"
                      data-number="{{ dc.card.collector_number or '' }}"
@@ -609,6 +628,9 @@
                     <div class="deck-card-info">
                         <h3 class="deck-card-title">
                             <a href="/card/{{ dc.card.id }}">{{ dc.card.name }}</a>
+                            {% if dc.card.name in illegal_card_names %}
+                                <span class="badge" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3); margin-left: 4px; font-weight: 800;" title="Banned or exceeds limit">⚠️ ILLEGAL</span>
+                            {% endif %}
                             {% if dc.card.is_foil %}
                                 <span class="foil-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: linear-gradient(135deg, #ec4899, #3b82f6); color: #fff; margin-left: 4px; font-weight: 800;">FOIL</span>
                             {% endif %}

@@ -176,14 +176,36 @@
         .decks-stats-card .value {
             font-size: 1.3rem !important;
         }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     }
 </style>
 
 <div class="decks-header">
     <h1 style="margin: 0; border: none; padding: 0;">My Spell Decks</h1>
-    <a href="/decks/import" class="btn" style="padding: 10px 20px; text-decoration: none; border-radius: 8px;">
-        <span>Import Deck</span>
-    </a>
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <button id="auditBtn" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+            <span class="audit-icon">🛡️</span> <span class="audit-text">Sanity Check Decks</span>
+        </button>
+        <a href="/decks/import" class="btn" style="padding: 10px 20px; text-decoration: none; border-radius: 8px; display: inline-flex; align-items: center;">
+            <span>Import Deck</span>
+        </a>
+    </div>
+</div>
+
+<div id="auditStatusBar" class="analytics-panel" style="display: none; margin-bottom: 24px; padding: 16px 20px; border-radius: 12px; background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.25);">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="spinner-mini" id="auditSpinner" style="border: 2px solid rgba(255,255,255,0.1); border-left-color: var(--accent-purple); width: 16px; height: 16px; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <span id="auditMessage" style="font-weight: 600; font-size: 0.95rem; color: var(--text-main);">Auditing card formats...</span>
+        </div>
+        <span id="auditProgressText" style="font-size: 0.85rem; font-weight: bold; color: var(--accent-purple);">0%</span>
+    </div>
+    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+        <div id="auditProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); transition: width 0.25s ease;"></div>
+    </div>
 </div>
 
 <div class="decks-stats-grid">
@@ -217,6 +239,23 @@
         </span>
         <span class="sub-value" style="color: var(--accent-green);">Active Metagame</span>
     </div>
+    <div class="decks-stats-card">
+        <span class="label">Audit Status</span>
+        <span class="value" id="statsAuditValue" style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+            {% if last_audited %}
+                🛡️ Verified
+            {% else %}
+                ⚠️ Unchecked
+            {% endif %}
+        </span>
+        <span class="sub-value" id="statsAuditSub" style="color: var(--text-muted);">
+            {% if last_audited %}
+                Last check: {{ last_audited }}
+            {% else %}
+                Run Sanity Check
+            {% endif %}
+        </span>
+    </div>
 </div>
 
 <div class="create-deck-panel">
@@ -246,7 +285,14 @@
                 <div>
                     <h3 class="deck-name">
                         <a href="/deck/{{ d.id }}">{{ d.name }}</a>
-                        <span class="format-badge-deck badge-{{ d.format }}">{{ d.format }}</span>
+                        <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+                            <span class="format-badge-deck badge-{{ d.format }}">{{ d.format }}</span>
+                            {% if d.is_legal == False %}
+                                <span class="format-badge-deck" style="color: var(--accent-rose); border-color: rgba(244,63,94,0.3); background: rgba(244,63,94,0.1); font-size: 0.65rem;" title="Contains illegal or banned cards">⚠️ Illegal</span>
+                            {% else %}
+                                <span class="format-badge-deck" style="color: var(--accent-green); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); font-size: 0.65rem;" title="Verified Legal">✓ Legal</span>
+                            {% endif %}
+                        </div>
                     </h3>
                     <p class="deck-desc">{{ d.description or 'No strategy description provided.' }}</p>
                 </div>
@@ -284,5 +330,95 @@
             link.classList.remove('active');
         }
     });
+
+    // Legality auditing client side code
+    const auditBtn = document.getElementById('auditBtn');
+    const auditStatusBar = document.getElementById('auditStatusBar');
+    const auditMessage = document.getElementById('auditMessage');
+    const auditProgressBar = document.getElementById('auditProgressBar');
+    const auditProgressText = document.getElementById('auditProgressText');
+    const statsAuditValue = document.getElementById('statsAuditValue');
+    const statsAuditSub = document.getElementById('statsAuditSub');
+
+    let pollInterval = null;
+
+    function startPollingStatus() {
+        if (pollInterval) clearInterval(pollInterval);
+        
+        pollInterval = setInterval(() => {
+            fetch('/decks/audit/status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.in_progress) {
+                        auditStatusBar.style.display = 'block';
+                        auditBtn.disabled = true;
+                        auditBtn.style.opacity = '0.6';
+                        auditBtn.querySelector('.audit-text').innerText = 'Auditing...';
+                        
+                        auditMessage.innerText = data.message;
+                        const pct = data.total > 0 ? Math.round((data.progress / data.total) * 100) : 0;
+                        auditProgressBar.style.width = pct + '%';
+                        auditProgressText.innerText = pct + '%';
+                    } else {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        
+                        auditBtn.disabled = false;
+                        auditBtn.style.opacity = '1';
+                        auditBtn.querySelector('.audit-text').innerText = 'Sanity Check Decks';
+                        
+                        if (data.message.includes('completed') || data.message.includes('Audit completed')) {
+                            auditMessage.innerText = 'Audit Complete! Reloading...';
+                            auditProgressBar.style.width = '100%';
+                            auditProgressText.innerText = '100%';
+                            
+                            // Reload page to reflect updated legality statuses
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else if (data.message.includes('failed') || data.message.includes('Error')) {
+                            alert(data.message);
+                            auditStatusBar.style.display = 'none';
+                        } else {
+                            auditStatusBar.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error polling status:', err);
+                });
+        }, 800);
+    }
+
+    auditBtn.addEventListener('click', () => {
+        auditBtn.disabled = true;
+        auditBtn.style.opacity = '0.6';
+        auditBtn.querySelector('.audit-text').innerText = 'Requesting audit...';
+        
+        fetch('/decks/audit', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                auditStatusBar.style.display = 'block';
+                auditProgressBar.style.width = '0%';
+                auditProgressText.innerText = '0%';
+                auditMessage.innerText = 'Connecting to Scryfall index...';
+                startPollingStatus();
+            })
+            .catch(err => {
+                console.error('Error starting audit:', err);
+                auditBtn.disabled = false;
+                auditBtn.style.opacity = '1';
+                auditBtn.querySelector('.audit-text').innerText = 'Sanity Check Decks';
+            });
+    });
+
+    // Check if an audit is already running on page load
+    fetch('/decks/audit/status')
+        .then(res => res.json())
+        .then(data => {
+            if (data.in_progress) {
+                startPollingStatus();
+            }
+        });
 </script>
 {% endblock %}
