@@ -28,6 +28,16 @@ def get_condition_multiplier(condition):
 def scoped(model):
     return model.query.filter_by(user_id=session.get('user_id'))
 
+def get_site_admin():
+    """Returns the site admin — always the first user who registered (lowest id).
+    No username is hardcoded; works correctly on any install."""
+    return User.query.order_by(User.id).first()
+
+def is_current_user_site_admin():
+    """Returns True if the currently logged-in session user is the site admin."""
+    admin = get_site_admin()
+    return admin is not None and session.get('user_id') == admin.id
+
 @app.before_request
 def check_auth():
     # Allow access to login route, register route, public showcase(s), and static files
@@ -2970,16 +2980,15 @@ def view_showcase(username=None):
     if total_collection_val > 0:
         concentration = (total_value / total_collection_val) * 100
 
-    # Only show approved comments publicly; jbell also sees pending queue
-    jbell_user = User.query.filter_by(username='jbell').first()
-    is_jbell = jbell_user and session.get('user_id') == jbell_user.id
+    # Only show approved comments publicly; site admin also sees pending queue
+    is_admin = is_current_user_site_admin()
 
     approved_comments = ShowcaseComment.query.filter_by(
         showcase_user_id=user.id, is_approved=True
     ).order_by(ShowcaseComment.created_at.desc()).all()
 
     pending_comments = []
-    if is_jbell:
+    if is_admin:
         pending_comments = ShowcaseComment.query.filter_by(
             showcase_user_id=user.id, is_approved=False
         ).order_by(ShowcaseComment.created_at.asc()).all()
@@ -2993,7 +3002,7 @@ def view_showcase(username=None):
                            showcase_user=user,
                            comments=approved_comments,
                            pending_comments=pending_comments,
-                           is_jbell=is_jbell)
+                           is_site_admin=is_admin)
 
 
 @app.route('/showcase/<username>/comment', methods=['POST'])
@@ -3016,7 +3025,7 @@ def post_showcase_comment(username):
         raw_name = (request.form.get('author_name') or '').strip()
         author_name = raw_name[:80] if raw_name else 'Anonymous'
         author_id = None
-        is_approved = False  # guests require jbell approval
+        is_approved = False  # guests require site admin approval
 
     comment = ShowcaseComment(
         showcase_user_id=showcase_user.id,
@@ -3053,9 +3062,8 @@ def delete_showcase_comment(username, comment_id):
 
 @app.route('/showcase/<username>/comment/<int:comment_id>/approve', methods=['POST'])
 def approve_showcase_comment(username, comment_id):
-    """Approve a pending guest comment — only jbell can do this."""
-    jbell_user = User.query.filter_by(username='jbell').first()
-    if not jbell_user or session.get('user_id') != jbell_user.id:
+    """Approve a pending guest comment — only the site admin (first registered user) can do this."""
+    if not is_current_user_site_admin():
         abort(403)
     comment = ShowcaseComment.query.get_or_404(comment_id)
     comment.is_approved = True
@@ -3066,14 +3074,13 @@ def approve_showcase_comment(username, comment_id):
 
 @app.route('/showcase/<username>/comment/<int:comment_id>/reject', methods=['POST'])
 def reject_showcase_comment(username, comment_id):
-    """Reject (delete) a pending guest comment — only jbell can do this."""
-    jbell_user = User.query.filter_by(username='jbell').first()
-    if not jbell_user or session.get('user_id') != jbell_user.id:
+    """Reject (delete) a pending guest comment — only the site admin (first registered user) can do this."""
+    if not is_current_user_site_admin():
         abort(403)
     comment = ShowcaseComment.query.get_or_404(comment_id)
     db.session.delete(comment)
     db.session.commit()
-    flash(f'Comment rejected and removed.', 'success')
+    flash('Comment rejected and removed.', 'success')
     return redirect(url_for('view_showcase', username=username) + '#comments')
 
 

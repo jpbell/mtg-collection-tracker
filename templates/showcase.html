@@ -1295,15 +1295,15 @@
         <span style="font-family: sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); -webkit-text-fill-color: var(--text-muted);">
             ({{ comments|length }})
         </span>
-        {% if is_jbell and pending_comments %}
+        {% if is_site_admin and pending_comments %}
         <span style="font-family: sans-serif; font-size: 0.78rem; font-weight: 700; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #f59e0b; -webkit-text-fill-color: #f59e0b; padding: 3px 10px; border-radius: 20px; margin-left: 6px;">
             {{ pending_comments|length }} pending
         </span>
         {% endif %}
     </div>
 
-    {# ---- jbell moderation panel for pending guest comments ---- #}
-    {% if is_jbell and pending_comments %}
+    {# ---- site admin moderation panel for pending guest comments ---- #}
+    {% if is_site_admin and pending_comments %}
     <div style="background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.3); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
         <div style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
             🛡️ Pending Guest Comments — Awaiting Your Approval
