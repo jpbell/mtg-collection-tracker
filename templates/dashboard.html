@@ -555,8 +555,61 @@
     </div>
 </div>
 
+<!-- Day-to-Day Value Tracking Table -->
+<div class="chart-panel" style="margin-top: 24px; margin-bottom: 24px; width: 100%;">
+    <h3 style="font-family: 'Cinzel', serif; margin-bottom: 15px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">📅 Day-to-Day Value Tracking</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--panel-border);">
+                    <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Date</th>
+                    <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Collection Value</th>
+                    <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Daily Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if daily_history %}
+                    {% for day in daily_history %}
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background-color 0.2s;">
+                            <td style="padding: 12px; font-weight: 600; color: var(--text-main);">{{ day.date }}</td>
+                            <td style="padding: 12px; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(day.value) }}</td>
+                            <td style="padding: 12px; font-weight: 700;">
+                                {% if day.change_val is not none %}
+                                    {% if day.change_val > 0.005 %}
+                                        <span style="color: var(--accent-green);">▲ +${{ "%.2f"|format(day.change_val) }} (+{{ "%.2f"|format(day.change_pct) }}%)</span>
+                                    {% elif day.change_val < -0.005 %}
+                                        <span style="color: var(--accent-rose);">▼ -${{ "%.2f"|format(-day.change_val) }} ({{ "%.2f"|format(day.change_pct) }}%)</span>
+                                    {% else %}
+                                        <span style="color: var(--text-muted);">0.00 (0.00%)</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: var(--text-muted); font-style: italic;">— (Baseline)</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3" style="padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;">Nosnapshots recorded yet.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    {% if needs_auto_refresh %}
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            if (typeof startPriceRefresh === 'function') {
+                startPriceRefresh(true);
+            }
+        }, 800);
+    });
+    {% endif %}
+
     // --- History Line Chart ---
     const historyRaw = {{ history_data|tojson }};
     historyRaw.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));

@@ -80,6 +80,10 @@ class Card(db.Model):
     is_modern = db.Column(db.Boolean, default=True, server_default='1')
     is_vintage = db.Column(db.Boolean, default=True, server_default='1')
     released_at = db.Column(db.String(10), nullable=True)
+    last_summoned = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
+    acquired_price = db.Column(db.Float, nullable=True)
+    is_promo = db.Column(db.Boolean, default=False, server_default='0')
+    promo_types = db.Column(db.String(255), nullable=True)
 
 
 
@@ -209,6 +213,32 @@ def upgrade_database_schema():
                         conn.execute(db.text("ALTER TABLE card ADD COLUMN released_at VARCHAR(10)"))
                 except Exception as e:
                     print(f"Failed to alter table card to add released_at: {e}")
+            if table == 'card' and 'last_summoned' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN last_summoned DATETIME"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add last_summoned: {e}")
+            if table == 'card' and 'acquired_price' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN acquired_price REAL"))
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("UPDATE card SET acquired_price = price WHERE acquired_price IS NULL"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add acquired_price: {e}")
+            if table == 'card' and 'is_promo' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN is_promo BOOLEAN DEFAULT 0"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add is_promo: {e}")
+            if table == 'card' and 'promo_types' not in columns:
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE card ADD COLUMN promo_types VARCHAR(255)"))
+                except Exception as e:
+                    print(f"Failed to alter table card to add promo_types: {e}")
 
 
 
@@ -240,11 +270,21 @@ def record_snapshot(user_id=None):
 # --- Routes ---
 @app.route('/')
 def index():
-    cards = scoped(Card).order_by(Card.id.desc()).all()
+    cards = scoped(Card).order_by(Card.last_summoned.desc(), Card.id.desc()).all()
     total_value = sum((c.price or 0.0) * c.quantity for c in cards)
     if scoped(ValueSnapshot).count() == 0 and len(cards) > 0:
         record_snapshot()
         
+    # Check if price auto-refresh is needed for the day
+    needs_auto_refresh = False
+    if cards:
+        last_updated = get_last_price_update_time()
+        if last_updated is None:
+            needs_auto_refresh = True
+        else:
+            if last_updated.date() < datetime.utcnow().date():
+                needs_auto_refresh = True
+
     # Fetch all custom decks for synergy suggestions
     decks = scoped(Deck).all()
     decks_data = []
@@ -261,7 +301,7 @@ def index():
             'colors': list(deck_colors)
         })
         
-    return render_template('index.html', cards=cards, total_value=total_value, decks=decks_data)
+    return render_template('index.html', cards=cards, total_value=total_value, decks=decks_data, needs_auto_refresh=needs_auto_refresh)
 
 @app.route('/add', methods=['POST'])
 def add_card():
@@ -292,6 +332,7 @@ def add_card():
  
         if existing_card:
             existing_card.quantity += 1
+            existing_card.last_summoned = datetime.utcnow()
             db.session.commit()
             record_snapshot()
             flash(f"Increased quantity of {existing_card.name} ({existing_card.condition}, {'Foil' if is_foil else 'Non-Foil'}) to {existing_card.quantity} (${existing_card.price:.2f} each)!", "success")
@@ -315,11 +356,15 @@ def add_card():
             is_modern = (legalities.get('modern') in ['legal', 'restricted'])
             is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
             released_at = d.get('released_at')
+            is_promo = d.get('promo', False)
+            promo_types_list = d.get('promo_types', [])
+            promo_types = ",".join(promo_types_list) if promo_types_list else None
             
             db.session.add(Card(name=d['name'], set_code=set_code, 
                                 collector_number=collector_number, 
                                 rarity=d['rarity'], image_url=d.get('image_uris', {}).get('normal'), 
                                 price=price,
+                                acquired_price=price,
                                 quantity=1,
                                 is_foil=is_foil,
                                 mana_cost=mana_cost,
@@ -331,7 +376,10 @@ def add_card():
                                 condition=condition,
                                 is_modern=is_modern,
                                 is_vintage=is_vintage,
-                                released_at=released_at))
+                                released_at=released_at,
+                                last_summoned=datetime.utcnow(),
+                                is_promo=is_promo,
+                                promo_types=promo_types))
 
 
             db.session.commit()
@@ -344,8 +392,11 @@ def add_card():
 @app.route('/update_quantity/<int:id>/<action>')
 def update_quantity(id, action):
     card = scoped(Card).filter_by(id=id).first_or_404()
-    if action == 'add': card.quantity += 1
-    elif action == 'sub' and card.quantity > 0: card.quantity -= 1
+    if action == 'add':
+        card.quantity += 1
+        card.last_summoned = datetime.utcnow()
+    elif action == 'sub' and card.quantity > 0:
+        card.quantity -= 1
     db.session.commit()
     record_snapshot()
     return redirect(url_for('index'))
@@ -759,6 +810,40 @@ def dashboard():
             'format': d.format,
             'colors': list(deck_colors)
         })
+    # Group snapshots by day (UTC)
+    daily_snapshots = {}
+    for h in history:
+        day_str = h.timestamp.date().isoformat()
+        daily_snapshots[day_str] = h.total_value
+    
+    sorted_days = sorted(daily_snapshots.keys())
+    daily_history = []
+    prev_value = None
+    for day in sorted_days:
+        val = daily_snapshots[day]
+        change_val = None
+        change_pct = None
+        if prev_value is not None and prev_value != 0:
+            change_val = val - prev_value
+            change_pct = (change_val / prev_value) * 100
+        daily_history.append({
+            'date': day,
+            'value': val,
+            'change_val': change_val,
+            'change_pct': change_pct
+        })
+        prev_value = val
+    daily_history.reverse()
+
+    # Check if price auto-refresh is needed for the day
+    needs_auto_refresh = False
+    if all_cards or scoped(ArtCard).count() > 0:
+        last_updated = get_last_price_update_time()
+        if last_updated is None:
+            needs_auto_refresh = True
+        else:
+            if last_updated.date() < datetime.utcnow().date():
+                needs_auto_refresh = True
 
     return render_template('dashboard.html', 
         total_cards=total_cards,
@@ -779,7 +864,9 @@ def dashboard():
         recent_additions=combined_recent,
         set_completion=set_completion,
         last_price_update=get_last_price_update_time(),
-        decks=decks_data)
+        decks=decks_data,
+        daily_history=daily_history,
+        needs_auto_refresh=needs_auto_refresh)
 
 @app.route('/releases')
 def view_releases():
@@ -901,6 +988,124 @@ def refresh_prices():
         
     return redirect(url_for('dashboard'))
 
+@app.route('/refresh_prices_stream')
+def refresh_prices_stream():
+    from flask import Response
+    user_id = session.get('user_id')
+    if not user_id:
+        return Response("Unauthorized", status=401)
+        
+    def generate():
+        cards = Card.query.filter_by(user_id=user_id).all()
+        art_cards = ArtCard.query.filter_by(user_id=user_id).all()
+        
+        if not cards and not art_cards:
+            yield "data: " + json.dumps({'status': 'complete', 'updated_count': 0, 'message': 'No cards to refresh.'}) + "\n\n"
+            return
+            
+        distinct_keys = set()
+        playable_names = set()
+        for card in cards:
+            if card.set_code and card.collector_number:
+                distinct_keys.add((card.set_code.lower().strip(), str(card.collector_number).lower().strip()))
+        for ac in art_cards:
+            if ac.set_code and ac.collector_number:
+                distinct_keys.add((ac.set_code.lower().strip(), str(ac.collector_number).lower().strip()))
+            if ac.name:
+                playable_name = ac.name.split(' // ')[0].strip()
+                playable_names.add(playable_name.lower().strip())
+                
+        identifiers = [{'set': key[0], 'collector_number': key[1]} for key in distinct_keys]
+        for name in playable_names:
+            identifiers.append({'name': name})
+            
+        total_steps = len(identifiers)
+        yield "data: " + json.dumps({'status': 'start', 'total': total_steps, 'message': f'Starting refresh of {total_steps} unique printings...'}) + "\n\n"
+        
+        scryfall_cards = []
+        chunk_size = 75
+        processed_count = 0
+        
+        for i in range(0, len(identifiers), chunk_size):
+            chunk = identifiers[i:i + chunk_size]
+            try:
+                res = requests.post(
+                    'https://api.scryfall.com/cards/collection',
+                    json={'identifiers': chunk},
+                    headers={'User-Agent': 'MTGTracker/1.0'},
+                    timeout=15
+                )
+                if res.status_code == 200:
+                    scryfall_cards.extend(res.json().get('data', []))
+                
+                processed_count += len(chunk)
+                percent = int((processed_count / total_steps) * 100)
+                yield "data: " + json.dumps({'status': 'progress', 'percent': percent, 'processed': processed_count, 'total': total_steps, 'message': f'Downloaded {processed_count} of {total_steps} cards from Scryfall...' }) + "\n\n"
+                
+                time.sleep(0.1)
+            except Exception as e:
+                print("Failed to fetch bulk card prices chunk:", e)
+                yield "data: " + json.dumps({'status': 'error', 'message': f'Error fetching chunk: {str(e)}'}) + "\n\n"
+                
+        # Map the results to a dictionary of prices
+        price_map = {}
+        for sc in scryfall_cards:
+            s_code = sc.get('set', '').lower().strip()
+            coll_num = sc.get('collector_number', '').lower().strip()
+            prices = sc.get('prices', {})
+            if s_code and coll_num:
+                price_map[(s_code, coll_num)] = prices
+            c_name = sc.get('name', '').lower().strip()
+            if c_name:
+                price_map[c_name] = prices
+                if ' // ' in c_name:
+                    price_map[c_name.split(' // ')[0].strip()] = prices
+                    
+        # Update cards
+        updated_count = 0
+        for card in cards:
+            key = (card.set_code.lower().strip(), str(card.collector_number).lower().strip())
+            prices = price_map.get(key)
+            if prices:
+                price_key = 'usd_foil' if card.is_foil else 'usd'
+                new_price_str = prices.get(price_key) or prices.get('usd')
+                if new_price_str:
+                    try:
+                        card.price = float(new_price_str) * get_condition_multiplier(card.condition)
+                        updated_count += 1
+                    except ValueError:
+                        pass
+                        
+        for ac in art_cards:
+            prices = None
+            if ac.set_code and ac.collector_number:
+                key = (ac.set_code.lower().strip(), str(ac.collector_number).lower().strip())
+                prices = price_map.get(key)
+            new_price_str = None
+            if prices:
+                new_price_str = prices.get('usd') or prices.get('usd_foil')
+            if not new_price_str and ac.name:
+                playable_name = ac.name.split(' // ')[0].strip().lower()
+                playable_prices = price_map.get(playable_name)
+                if playable_prices:
+                    new_price_str = playable_prices.get('usd') or playable_prices.get('usd_foil')
+            if new_price_str:
+                try:
+                    ac.price = float(new_price_str)
+                    updated_count += 1
+                except ValueError:
+                    pass
+                    
+        if updated_count > 0:
+            db.session.commit()
+            record_snapshot(user_id=user_id)
+            save_last_price_update_time()
+            
+        yield "data: " + json.dumps({'status': 'complete', 'updated_count': updated_count, 'message': f'Success! Refreshed prices for {updated_count} cards.'}) + "\n\n"
+        
+    from flask import stream_with_context
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
 @app.route('/search_scryfall_prints')
 def search_scryfall_prints():
     query = request.args.get('q', '').strip()
@@ -956,6 +1161,8 @@ def search_scryfall_prints():
                     'color_identity': item.get('color_identity', []),
                     'colors': item.get('colors', []),
                     'purchase_uris': item.get('purchase_uris', {}),
+                    'is_promo': item.get('promo', False),
+                    'promo_types': ",".join(item.get('promo_types', [])) if item.get('promo_types') else None,
                     'owned_total': int(owned_total),
                     'owned_spec': int(owned_spec),
                     'wish_total': int(wish_total),
@@ -1029,6 +1236,8 @@ def search_scryfall_prints():
                     'color_identity': item.get('color_identity', []),
                     'colors': item.get('colors', []),
                     'purchase_uris': item.get('purchase_uris', {}),
+                    'is_promo': item.get('promo', False),
+                    'promo_types': ",".join(item.get('promo_types', [])) if item.get('promo_types') else None,
                     'owned_total': int(owned_total),
                     'owned_spec': int(owned_spec),
                     'wish_total': int(wish_total),
@@ -2521,6 +2730,96 @@ def import_db():
             return redirect(url_for('view_settings'))
             
     return redirect(url_for('view_settings'))
+
+def get_github_token_from_git():
+    try:
+        import subprocess
+        result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, timeout=3)
+        url = result.stdout.strip()
+        if url and "@" in url:
+            part = url.split("://")[1].split("@")[0]
+            if ":" in part:
+                return part.split(":")[0]
+            return part
+    except Exception:
+        pass
+    return None
+
+@app.route('/api/check_updates')
+def check_updates():
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    latest_local = ReleaseNote.query.order_by(ReleaseNote.id.desc()).first()
+    local_version = latest_local.version if latest_local else '0.0.0'
+    
+    headers = {"User-Agent": "MTGTracker/1.0"}
+    token = os.environ.get("GITHUB_TOKEN") or get_github_token_from_git()
+    if token:
+        headers["Authorization"] = f"token {token}"
+        
+    try:
+        res = requests.get('https://api.github.com/repos/jpbell/mtg-collection-tracker/releases/latest', headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            gh_tag = data.get('tag_name', '').replace('v', '').strip()
+            
+            # Compare local vs github version
+            local_parts = [int(p) for p in local_version.split('.') if p.isdigit()]
+            gh_parts = [int(p) for p in gh_tag.split('.') if p.isdigit()]
+            
+            max_len = max(len(local_parts), len(gh_parts))
+            local_parts += [0] * (max_len - len(local_parts))
+            gh_parts += [0] * (max_len - len(gh_parts))
+            
+            update_available = gh_parts > local_parts
+            
+            return jsonify({
+                'update_available': update_available,
+                'latest_version': gh_tag,
+                'current_version': local_version,
+                'description': data.get('body', '')
+            })
+    except Exception as e:
+        print("Failed to check GitHub releases:", e)
+        
+    return jsonify({
+        'update_available': False,
+        'latest_version': local_version,
+        'current_version': local_version
+    })
+
+@app.route('/api/trigger_update', methods=['POST'])
+def trigger_update():
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    import subprocess
+    try:
+        subprocess.run(["git", "fetch", "origin"], check=True, timeout=15)
+        branch_res = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True)
+        branch = branch_res.stdout.strip() or 'main'
+        
+        pull_res = subprocess.run(["git", "pull", "origin", branch], capture_output=True, text=True, check=True)
+        upgrade_database_schema()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Successfully updated codebase from origin/{branch}!",
+            'git_output': pull_res.stdout.strip()
+        })
+    except subprocess.CalledProcessError as e:
+        print("Git pull failed:", e.stderr)
+        return jsonify({
+            'success': False,
+            'message': f"Git command failed: {e.stderr or str(e)}"
+        }), 500
+    except Exception as e:
+        print("Update error:", e)
+        return jsonify({
+            'success': False,
+            'message': f"Failed to perform update: {str(e)}"
+        }), 500
 
 @app.route('/showcase')
 @app.route('/showcase/<username>')

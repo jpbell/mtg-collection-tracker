@@ -285,6 +285,167 @@
         text-shadow: none !important;
     }
 
+    /* Price Change Indicator Styles */
+    .price-change {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 1px 4px;
+        border-radius: 4px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+    }
+    .price-change.positive {
+        color: var(--accent-green);
+        background: rgba(16, 185, 129, 0.08);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .price-change.negative {
+        color: var(--accent-rose);
+        background: rgba(244, 63, 94, 0.08);
+        border: 1px solid rgba(244, 63, 94, 0.2);
+    }
+
+    /* Compact / Images Only View Styles */
+    .view-compact.cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+        gap: 12px !important;
+    }
+    .view-compact .card-item {
+        padding: 0 !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+    }
+    .view-compact .card-info {
+        display: none !important;
+    }
+    .view-compact .compact-badges {
+        display: flex !important;
+    }
+
+    .compact-badges {
+        display: none;
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        z-index: 10;
+        pointer-events: none;
+        gap: 4px;
+        align-items: center;
+    }
+    .compact-qty-badge {
+        background: rgba(11, 9, 20, 0.85);
+        backdrop-filter: blur(4px);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 5px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .compact-foil-badge {
+        background: linear-gradient(135deg, #ec4899, #3b82f6, #eab308);
+        font-size: 0.65rem;
+        padding: 2px 4px;
+        border-radius: 4px;
+        line-height: 1;
+        color: #0c0a1c;
+        font-weight: bold;
+    }
+    .compact-promo-badge {
+        background: rgba(168, 85, 247, 0.85);
+        color: #fff;
+        font-size: 0.65rem;
+        padding: 2px 4px;
+        border-radius: 4px;
+        line-height: 1;
+        font-weight: bold;
+    }
+
+    /* List View Styles */
+    .view-list.cards-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    .view-list .card-item {
+        flex-direction: row !important;
+        align-items: center !important;
+        padding: 8px 16px !important;
+        height: auto !important;
+        transform: none !important;
+        box-shadow: none !important;
+        border-radius: 8px !important;
+    }
+    .view-list .card-item:hover {
+        border-color: var(--accent-purple) !important;
+        box-shadow: 0 4px 15px rgba(var(--accent-purple-rgb), 0.1) !important;
+        transform: none !important;
+    }
+    .view-list .card-image-wrapper {
+        width: 44px !important;
+        height: 60px !important;
+        padding-top: 0 !important;
+        flex-shrink: 0 !important;
+        border-radius: 4px !important;
+    }
+    .view-list .card-image-wrapper .card-image {
+        position: static !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+    .view-list .card-image-wrapper .card-placeholder {
+        position: static !important;
+        width: 100% !important;
+        height: 100% !important;
+        font-size: 0.45rem !important;
+        padding: 2px !important;
+    }
+    .view-list .card-info {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 0 !important;
+        flex-grow: 1 !important;
+        gap: 12px !important;
+    }
+    .view-list .card-title {
+        font-size: 0.95rem !important;
+        width: 180px !important;
+        min-width: 120px !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin: 0 !important;
+    }
+    .view-list .card-meta {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin-top: 0 !important;
+        flex-grow: 1 !important;
+        flex-wrap: wrap !important;
+    }
+    .view-list .card-price {
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+        min-width: 90px !important;
+        text-align: right !important;
+        flex-shrink: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+    }
+    .view-list .card-controls {
+        margin-top: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        flex-shrink: 0 !important;
+    }
+
     /* Glassmorphic Control Panel Grid */
     .control-panels-grid {
         display: grid;
@@ -825,6 +986,7 @@
                     <option value="Damaged">Damaged (DMG)</option>
                 </select>
                 <button type="submit" class="btn" style="padding: 8px 16px; background: var(--accent-purple); font-size: 0.85rem; border-radius: 8px; border: none; font-weight: 700; color: #ffffff;">Summon Card</button>
+                <button type="button" id="openScannerBtn" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">📷 Scan Card</button>
             </div>
         </form>
     </div>
@@ -937,6 +1099,11 @@
             <div style="display: flex; gap: 8px; align-items: center;">
                 <span class="search-hint">Syntax support active</span>
                 <button type="button" id="clearFiltersBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; height: 26px;">Clear Filters</button>
+                <div class="view-switcher" style="display: inline-flex; gap: 2px; background: rgba(0,0,0,0.2); padding: 2px; border-radius: 6px; border: 1px solid var(--panel-border); margin-left: 8px;">
+                    <button type="button" id="viewGridBtn" class="btn btn-view active" title="Card Preview" style="padding: 2px 6px; font-size: 0.72rem; border-radius: 4px; border: none; background: var(--accent-purple); color: #fff; cursor: pointer; font-weight: bold;">🖼️ Grid</button>
+                    <button type="button" id="viewCompactBtn" class="btn btn-view" title="Images Only" style="padding: 2px 6px; font-size: 0.72rem; border-radius: 4px; border: none; background: none; color: var(--text-muted); cursor: pointer;">✨ Images</button>
+                    <button type="button" id="viewListBtn" class="btn btn-view" title="List View" style="padding: 2px 6px; font-size: 0.72rem; border-radius: 4px; border: none; background: none; color: var(--text-muted); cursor: pointer;">📝 List</button>
+                </div>
             </div>
         </div>
     </div>
@@ -959,6 +1126,8 @@
                  data-commander="{{ 'true' if card.is_commander_candidate else 'false' }}"
                  data-illegal="{{ 'true' if card.is_illegal else 'false' }}"
                  data-price="{{ card.price or 0.0 }}"
+                 data-acquired-price="{{ card.acquired_price or card.price or 0.0 }}"
+                 data-promo="{{ 'true' if card.is_promo else 'false' }}"
                  data-qty="{{ card.quantity or 1 }}"
                  data-in-deck="{{ 'true' if card.is_in_deck else 'false' }}">
                 <div class="card-image-wrapper">
@@ -969,6 +1138,15 @@
                             <div>{{ card.name }}</div>
                         </div>
                     {% endif %}
+                    <div class="compact-badges">
+                        {% if card.is_promo %}
+                            <span class="compact-promo-badge" title="Promo Printing">🎁</span>
+                        {% endif %}
+                        {% if card.is_foil %}
+                            <span class="compact-foil-badge" title="Foil">✨</span>
+                        {% endif %}
+                        <span class="compact-qty-badge">x{{ card.quantity }}</span>
+                    </div>
                 </div>
                 <div class="card-info">
                     <h3 class="card-title">
@@ -983,6 +1161,9 @@
                             {% if card.is_foil %}
                                 <span class="badge foil-badge">Foil</span>
                             {% endif %}
+                            {% if card.is_promo %}
+                                <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);" title="Promo printing: {{ card.promo_types or 'Promo' }}">🎁 Promo</span>
+                            {% endif %}
                             {% if card.condition %}
                                 <span class="badge condition-{{ card.condition|lower|replace(' ', '-') }}">{{ card.condition }}</span>
                             {% endif %}
@@ -995,8 +1176,14 @@
                         </div>
                     </div>
 
-                    <div class="card-price">
-                        ${{ "%.2f"|format(card.price) }}
+                    <div class="card-price" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <span>${{ "%.2f"|format(card.price) }}</span>
+                        {% set gain_loss = card.price - (card.acquired_price or card.price) %}
+                        {% if gain_loss > 0.005 %}
+                            <span class="price-change positive" title="Value gained since acquired">▲ ${{ "%.2f"|format(gain_loss * card.quantity) }}</span>
+                        {% elif gain_loss < -0.005 %}
+                            <span class="price-change negative" title="Value lost since acquired">▼ ${{ "%.2f"|format(-gain_loss * card.quantity) }}</span>
+                        {% endif %}
                     </div>
                     <div class="card-controls">
                         <div class="qty-control">
@@ -1710,6 +1897,45 @@
         modal.scrollTop = 0;
         document.body.style.overflow = 'hidden';
 
+        // Populate Library Stats Panel
+        const statsContainer = document.getElementById('modalLibraryStatsContainer');
+        const statsQty = document.getElementById('modalLibraryQty');
+        const statsFoil = document.getElementById('modalLibraryFoilBadge');
+        const statsValue = document.getElementById('modalLibraryValue');
+        const statsGainLoss = document.getElementById('modalLibraryGainLossContainer');
+
+        if (dbId && statsContainer) {
+            const cardEl = document.querySelector(`.card-item[data-id="${dbId}"]`);
+            if (cardEl) {
+                const qty = parseInt(cardEl.getAttribute('data-qty') || '1');
+                const price = parseFloat(cardEl.getAttribute('data-price') || '0');
+                const acqPrice = parseFloat(cardEl.getAttribute('data-acquired-price') || price.toString());
+                const isFoil = cardEl.getAttribute('data-foil') === 'true';
+
+                statsQty.textContent = qty;
+                statsFoil.style.display = isFoil ? 'inline-block' : 'none';
+                statsValue.textContent = `$${(price * qty).toFixed(2)}`;
+
+                const diff = (price - acqPrice) * qty;
+                if (diff > 0.005) {
+                    statsGainLoss.style.color = 'var(--accent-green)';
+                    statsGainLoss.textContent = `▲ +$${diff.toFixed(2)}`;
+                } else if (diff < -0.005) {
+                    statsGainLoss.style.color = 'var(--accent-rose)';
+                    statsGainLoss.textContent = `▼ -$${Math.abs(diff).toFixed(2)}`;
+                } else {
+                    statsGainLoss.style.color = 'var(--text-muted)';
+                    statsGainLoss.textContent = `$0.00`;
+                }
+
+                statsContainer.style.display = 'flex';
+            } else {
+                statsContainer.style.display = 'none';
+            }
+        } else if (statsContainer) {
+            statsContainer.style.display = 'none';
+        }
+
         document.getElementById('modalCardName').textContent = item.name;
         document.getElementById('modalCardImage').src = item.image_url || 'https://svgshare.com/i/5xd.svg';
         document.getElementById('modalCardImage').alt = item.name;
@@ -2178,6 +2404,57 @@
             link.classList.add('active');
         }
     });
+
+    // --- View Switcher Logic ---
+    const viewGridBtn = document.getElementById('viewGridBtn');
+    const viewCompactBtn = document.getElementById('viewCompactBtn');
+    const viewListBtn = document.getElementById('viewListBtn');
+    const cardsGrid = document.querySelector('.cards-grid');
+
+    function setViewMode(mode) {
+        if (!cardsGrid) return;
+        cardsGrid.classList.remove('view-grid', 'view-compact', 'view-list');
+        cardsGrid.classList.add(`view-${mode}`);
+
+        // Update buttons active class
+        [viewGridBtn, viewCompactBtn, viewListBtn].forEach(btn => {
+            if (btn) {
+                btn.classList.remove('active');
+                btn.style.background = 'none';
+                btn.style.color = 'var(--text-muted)';
+                btn.style.fontWeight = 'normal';
+            }
+        });
+
+        const activeBtn = document.getElementById(`view${mode.charAt(0).toUpperCase() + mode.slice(1)}Btn`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+            activeBtn.style.background = 'var(--accent-purple)';
+            activeBtn.style.color = '#fff';
+            activeBtn.style.fontWeight = 'bold';
+        }
+
+        localStorage.setItem('collectionViewMode', mode);
+    }
+
+    if (viewGridBtn && viewCompactBtn && viewListBtn) {
+        viewGridBtn.addEventListener('click', () => setViewMode('grid'));
+        viewCompactBtn.addEventListener('click', () => setViewMode('compact'));
+        viewListBtn.addEventListener('click', () => setViewMode('list'));
+
+        // Load persisted view mode
+        const savedViewMode = localStorage.getItem('collectionViewMode') || 'grid';
+        setViewMode(savedViewMode);
+    }
+
+    {% if needs_auto_refresh %}
+    // Daily auto price refresh
+    setTimeout(() => {
+        if (typeof startPriceRefresh === 'function') {
+            startPriceRefresh(true);
+        }
+    }, 800);
+    {% endif %}
 </script>
 
 <!-- Hidden Form for Search Clicks / Modal -->
@@ -2218,6 +2495,20 @@
                 <!-- Legality Explanation Warning -->
                 <div id="modalLegalityWarning" style="display: none; padding: 10px 12px; background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: 8px; color: var(--accent-rose); font-size: 0.8rem; line-height: 1.4; font-weight: 500;">
                     <!-- JS populated -->
+                </div>
+
+                <!-- Library Stats Panel -->
+                <div id="modalLibraryStatsContainer" style="display: none; flex-direction: row; gap: 12px; font-size: 0.85rem; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); border-radius: 8px; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="color: var(--text-muted); font-weight: 600;">Owned:</span> <strong id="modalLibraryQty" style="color: var(--text-main);">0</strong>
+                        <span id="modalLibraryFoilBadge" class="badge foil-badge" style="margin-left: 6px; font-size: 0.65rem; padding: 1px 4px; display: none;">Foil</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--text-muted); font-weight: 600;">Value:</span> <strong id="modalLibraryValue" style="color: var(--accent-gold); font-size: 0.95rem;">$0.00</strong>
+                    </div>
+                    <div id="modalLibraryGainLossContainer" style="font-weight: 700;">
+                        <!-- populated programmatically -->
+                    </div>
                 </div>
                 
                 <!-- Format Legalities -->

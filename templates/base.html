@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #0b0914 0%, #120e25 50%, #05040a 100%);
@@ -897,7 +898,416 @@
                     window.location.reload();
                 });
             }
+
+            // Intercept Refresh Prices links
+            const refreshLinks = document.querySelectorAll('a[href="/refresh_prices"]');
+            refreshLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    startPriceRefresh();
+                });
+            });
+
+            // Check for updates from GitHub releases
+            fetch('/api/check_updates')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.update_available) {
+                        // Show badge on Settings link in navbar dropdown
+                        const settingsLink = document.querySelector('a[href="/settings"]');
+                        if (settingsLink) {
+                            settingsLink.innerHTML = 'Settings <span style="background: var(--accent-rose); color: white; border-radius: 4px; padding: 1px 5px; font-size: 0.65rem; font-weight: bold; margin-left: 6px; vertical-align: middle;">Update</span>';
+                        }
+                        
+                        // Populate and display Settings update card if we are on settings page
+                        const updateCard = document.getElementById('updateSettingsCard');
+                        if (updateCard) {
+                            document.getElementById('currentVersionText').textContent = 'v' + data.current_version;
+                            document.getElementById('latestVersionText').textContent = 'v' + data.latest_version;
+                            document.getElementById('updateReleaseNotes').textContent = data.description || 'No release details provided.';
+                            updateCard.style.display = 'flex';
+                        }
+                    }
+                })
+                .catch(err => console.error("Error checking updates:", err));
+        });
+
+        // --- Price Refresh Stream and Progress Bar ---
+        function startPriceRefresh(auto = false) {
+            const modal = document.getElementById('priceRefreshModal');
+            const progressBar = document.getElementById('refreshProgressBar');
+            const statusMessage = document.getElementById('refreshStatusMessage');
+            const progressPercent = document.getElementById('refreshProgressPercent');
+            const progressCount = document.getElementById('refreshProgressCount');
+            
+            if (!modal) return;
+            
+            modal.style.display = 'flex';
+            progressBar.style.width = '0%';
+            statusMessage.textContent = 'Initializing pricing stream...';
+            progressPercent.textContent = '0%';
+            progressCount.textContent = '0 / 0';
+
+            const eventSource = new EventSource('/refresh_prices_stream');
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.status === 'start') {
+                    statusMessage.textContent = data.message;
+                    progressCount.textContent = `0 / ${data.total}`;
+                } else if (data.status === 'progress') {
+                    progressBar.style.width = `${data.percent}%`;
+                    progressPercent.textContent = `${data.percent}%`;
+                    progressCount.textContent = `${data.processed} / ${data.total}`;
+                    statusMessage.textContent = data.message;
+                } else if (data.status === 'complete') {
+                    progressBar.style.width = '100%';
+                    progressPercent.textContent = '100%';
+                    statusMessage.textContent = data.message;
+                    eventSource.close();
+                    
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                        window.location.reload();
+                    }, 1200);
+                } else if (data.status === 'error') {
+                    statusMessage.textContent = `⚠️ Error: ${data.message}`;
+                    eventSource.close();
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                    }, 4000);
+                }
+            };
+            
+            eventSource.onerror = function() {
+                statusMessage.textContent = '⚠️ Stream connection failed. Retrying...';
+                eventSource.close();
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 3000);
+            };
+        }
+
+        // --- Card Scanner Camera & OCR ---
+        let mediaStream = null;
+
+        function startCamera(deviceId = null) {
+            const video = document.getElementById('scannerVideo');
+            if (!video) return;
+            
+            const constraints = {
+                video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
+            };
+            
+            stopCamera();
+            
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => {
+                    mediaStream = stream;
+                    video.srcObject = stream;
+                    updateCameraList();
+                })
+                .catch(err => {
+                    console.error("Camera access error:", err);
+                    // Do not alert if we just have no webcam, file upload is the fallback
+                });
+        }
+
+        function stopCamera() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            const video = document.getElementById('scannerVideo');
+            if (video) {
+                video.srcObject = null;
+            }
+        }
+
+        function updateCameraList() {
+            const select = document.getElementById('cameraSelect');
+            if (!select) return;
+            
+            navigator.mediaDevices.enumerateDevices()
+                .then(devices => {
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    if (select.options.length === videoDevices.length) return;
+                    
+                    select.innerHTML = '';
+                    videoDevices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.text = device.label || `Camera ${index + 1}`;
+                        select.appendChild(option);
+                    });
+                });
+        }
+
+        function runOCR(imageSrc) {
+            const ocrStatusContainer = document.getElementById('ocrStatusContainer');
+            const ocrLoader = document.getElementById('ocrLoader');
+            const ocrResultText = document.getElementById('ocrResultText');
+            const scannerResultsContainer = document.getElementById('scannerResultsContainer');
+            const scannerResultsList = document.getElementById('scannerResultsList');
+            
+            if (!ocrStatusContainer) return;
+            
+            ocrStatusContainer.style.display = 'block';
+            ocrLoader.style.display = 'flex';
+            ocrResultText.style.display = 'none';
+            scannerResultsContainer.style.display = 'none';
+            
+            Tesseract.recognize(
+                imageSrc,
+                'eng',
+                {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const pct = Math.round(m.progress * 100);
+                            ocrLoader.querySelector('span:last-child').textContent = `Reading text (${pct}%)...`;
+                        }
+                    }
+                }
+            ).then(({ data: { text } }) => {
+                ocrLoader.style.display = 'none';
+                const cleanedText = text.replace(/[^a-zA-Z0-9\s'/,-]/g, '').replace(/\n/g, ' ').trim();
+                if (!cleanedText) {
+                    ocrResultText.textContent = "Could not read card title. Position title inside dashes and try again.";
+                    ocrResultText.style.display = 'block';
+                    return;
+                }
+                
+                ocrResultText.textContent = `Detected Title: "${cleanedText}"`;
+                ocrResultText.style.display = 'block';
+                searchScryfallForScanner(cleanedText);
+            }).catch(err => {
+                console.error("OCR failed:", err);
+                ocrLoader.style.display = 'none';
+                ocrResultText.textContent = "OCR engine error. Try uploading a high-contrast file.";
+                ocrResultText.style.display = 'block';
+            });
+        }
+
+        function searchScryfallForScanner(name) {
+            const list = document.getElementById('scannerResultsList');
+            const container = document.getElementById('scannerResultsContainer');
+            if (!list || !container) return;
+            
+            list.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">Querying Scryfall printings...</div>';
+            container.style.display = 'flex';
+
+            fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("No printings found.");
+                    return res.json();
+                })
+                .then(data => {
+                    list.innerHTML = '';
+                    if (!data.data || data.data.length === 0) {
+                        list.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">No matches found on Scryfall.</div>';
+                        return;
+                    }
+                    
+                    data.data.slice(0, 10).forEach(card => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px; font-size: 0.85rem; gap: 10px;';
+                        
+                        const infoDiv = document.createElement('div');
+                        infoDiv.style.cssText = 'flex-grow: 1; min-width: 0;';
+                        infoDiv.innerHTML = `<div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${card.name}</div><div style="color: var(--text-muted); font-size: 0.72rem; margin-top: 2px;">${card.set.toUpperCase()} #${card.collector_number} · ${card.rarity}</div>`;
+                        
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'btn';
+                        btn.style.cssText = 'padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; background: var(--accent-purple); border: none; color: #fff; font-weight: 700; flex-shrink: 0; cursor: pointer;';
+                        btn.textContent = 'Summon';
+                        
+                        btn.addEventListener('click', () => {
+                            const setCodeInput = document.querySelector('input[name="set_code"]');
+                            const collectorInput = document.querySelector('input[name="collector_number"]');
+                            if (setCodeInput && collectorInput) {
+                                setCodeInput.value = card.set.toUpperCase();
+                                collectorInput.value = card.collector_number;
+                                setCodeInput.closest('form').submit();
+                            }
+                        });
+                        
+                        itemDiv.appendChild(infoDiv);
+                        itemDiv.appendChild(btn);
+                        list.appendChild(itemDiv);
+                    });
+                })
+                .catch(err => {
+                    list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">Scryfall search failed: ${err.message}</div>`;
+                });
+        }
+
+        // Initialize scanner listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            const openScanner = document.getElementById('openScannerBtn');
+            const closeScanner = document.getElementById('closeScannerModalBtn');
+            const scannerModal = document.getElementById('cardScannerModal');
+            const captureBtn = document.getElementById('captureBtn');
+            const video = document.getElementById('scannerVideo');
+            const canvas = document.getElementById('scannerCanvas');
+            const camSelect = document.getElementById('cameraSelect');
+            const fileInput = document.getElementById('scannerFileInput');
+            
+            if (openScanner && scannerModal) {
+                openScanner.addEventListener('click', () => {
+                    scannerModal.style.display = 'flex';
+                    startCamera();
+                });
+            }
+            
+            if (closeScanner && scannerModal) {
+                closeScanner.addEventListener('click', () => {
+                    scannerModal.style.display = 'none';
+                    stopCamera();
+                });
+            }
+            
+            if (camSelect) {
+                camSelect.addEventListener('change', (e) => {
+                    startCamera(e.target.value);
+                });
+            }
+            
+            if (captureBtn && video && canvas) {
+                captureBtn.addEventListener('click', () => {
+                    const ctx = canvas.getContext('2d');
+                    const videoWidth = video.videoWidth || 640;
+                    const videoHeight = video.videoHeight || 480;
+                    
+                    // dashed box is: top: 15%, left: 10%, width: 80%, height: 15%
+                    const sx = videoWidth * 0.1;
+                    const sy = videoHeight * 0.15;
+                    const sw = videoWidth * 0.8;
+                    const sh = videoHeight * 0.15;
+                    
+                    canvas.width = sw;
+                    canvas.height = sh;
+                    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+                    
+                    // Grayscale + high contrast threshold filter
+                    const imgData = ctx.getImageData(0, 0, sw, sh);
+                    const data = imgData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
+                        const val = brightness > 128 ? 255 : 0;
+                        data[i] = val;
+                        data[i+1] = val;
+                        data[i+2] = val;
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                    
+                    runOCR(canvas.toDataURL('image/png'));
+                });
+            }
+            
+            if (fileInput && canvas) {
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        const img = new Image();
+                        img.onload = function() {
+                            const ctx = canvas.getContext('2d');
+                            // Crop top 20%
+                            canvas.width = img.width;
+                            canvas.height = img.height * 0.2;
+                            ctx.drawImage(img, 0, 0, img.width, img.height * 0.2, 0, 0, img.width, img.height * 0.2);
+                            
+                            // Grayscale + Threshold
+                            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imgData.data;
+                            for (let i = 0; i < data.length; i += 4) {
+                                const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
+                                const val = brightness > 128 ? 255 : 0;
+                                data[i] = val;
+                                data[i+1] = val;
+                                data[i+2] = val;
+                            }
+                            ctx.putImageData(imgData, 0, 0);
+                            
+                            runOCR(canvas.toDataURL('image/png'));
+                        };
+                        img.src = evt.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
         });
     </script>
+
+    <!-- Style Keyframes & Modals -->
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- Modal: Price Refresh Progress -->
+    <div id="priceRefreshModal" class="modal-overlay" style="display: none; align-items: center; justify-content: center; flex-direction: column;">
+        <div class="glass-panel" style="width: 90%; max-width: 500px; padding: 30px; text-align: center; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <h3 style="font-family: 'Cinzel', serif; margin-bottom: 15px; color: var(--text-main); display: flex; align-items: center; justify-content: center; gap: 8px;">🔮 Syncing Library Prices</h3>
+            <p id="refreshStatusMessage" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Fetching latest price points from Scryfall...</p>
+            <div style="background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <div id="refreshProgressBar" style="background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                <span id="refreshProgressPercent">0%</span>
+                <span id="refreshProgressCount">0 / 0 unique keys</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Card Scanner -->
+    <div id="cardScannerModal" class="modal-overlay" style="display: none; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 500px; padding: 25px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; scrollbar-width: thin;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+                <h3 style="font-family: 'Cinzel', serif; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 8px;">📷 Card Scanner</h3>
+                <button type="button" id="closeScannerModalBtn" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Camera:</span>
+                <select id="cameraSelect" style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 6px; border-radius: 6px; font-size: 0.8rem; outline: none;"></select>
+            </div>
+
+            <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                <div style="position: absolute; top: 15%; left: 5%; right: 5%; height: 15%; border: 2px dashed var(--accent-purple); border-radius: 6px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 0.65rem; color: #fff; background: rgba(168, 85, 247, 0.85); padding: 2px 6px; border-radius: 4px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Align Card Title Here</span>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="captureBtn" class="btn" style="flex: 1; padding: 10px; background: var(--accent-purple); font-weight: 700; font-size: 0.85rem; border-radius: 8px; border: none; color: #fff; cursor: pointer;">Capture & Scan</button>
+                <button type="button" id="uploadFileBtn" class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; border-radius: 8px; border: none; cursor: pointer; position: relative; font-weight: 700;">
+                    <span>Upload Image</span>
+                    <input type="file" id="scannerFileInput" accept="image/*" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0; cursor: pointer;">
+                </button>
+            </div>
+
+            <canvas id="scannerCanvas" style="display: none;"></canvas>
+
+            <div id="ocrStatusContainer" style="display: none; padding: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 8px;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">OCR Analysis</div>
+                <div id="ocrLoader" style="color: var(--accent-cyan); font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; border: 2px solid var(--accent-cyan); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                    <span>Reading text (0%)...</span>
+                </div>
+                <div id="ocrResultText" style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-top: 4px; display: none; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);"></div>
+            </div>
+
+            <div id="scannerResultsContainer" style="display: none; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Matching Printings</div>
+                <div id="scannerResultsList" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; scrollbar-width: thin;"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

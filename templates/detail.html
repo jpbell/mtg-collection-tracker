@@ -69,6 +69,9 @@
             {% if card.is_foil %}
                 <span class="badge foil-badge">Foil</span>
             {% endif %}
+            {% if card.is_promo %}
+                <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);" title="Promo printing: {{ card.promo_types or 'Promo' }}">🎁 Promo</span>
+            {% endif %}
             {% if card.condition %}
                 <span class="badge condition-{{ card.condition|lower|replace(' ', '-') }}">{{ card.condition }}</span>
             {% endif %}
@@ -112,7 +115,15 @@
 
             <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Price (USD)</td>
-                <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(card.price) }}</td>
+                <td style="border: none; padding: 8px 0; font-size: 1.25rem; font-weight: 700; color: var(--accent-gold); display: flex; align-items: center; gap: 8px;">
+                    <span>${{ "%.2f"|format(card.price) }}</span>
+                    {% set gain_loss = card.price - (card.acquired_price or card.price) %}
+                    {% if gain_loss > 0.005 %}
+                        <span style="font-size: 0.85rem; font-weight: 700; color: var(--accent-green);" title="Value gained since acquired">▲ +${{ "%.2f"|format(gain_loss * card.quantity) }}</span>
+                    {% elif gain_loss < -0.005 %}
+                        <span style="font-size: 0.85rem; font-weight: 700; color: var(--accent-rose);" title="Value lost since acquired">▼ -${{ "%.2f"|format(-gain_loss * card.quantity) }}</span>
+                    {% endif %}
+                </td>
             </tr>
             <tr>
                 <td style="border: none; padding: 8px 24px 8px 0; color: var(--text-muted); font-weight: 600;">Library Quantity</td>
