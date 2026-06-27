@@ -309,9 +309,11 @@
         </p>
         <ul class="guide-list">
             <li><strong>OCR Title Scanner</strong>: Hold your card up to your webcam or upload a photo to scan it. The system crops and upscales the title area by 2x for high OCR precision.</li>
+            <li><strong>Camera Torch & Calibration Slider</strong>: Toggle the built-in camera flashlight (torch) to scan in low-light environments, and use the Crop Height slider to calibrate the guide box location dynamically to fit your card stand height.</li>
             <li><strong>Auto-Contrast & Inversion</strong>: Dynamically detects card brightness. Automatically inverts pixels for dark-background cards (like Black cards and Planeswalkers) so Tesseract always gets dark text on a light background.</li>
-            <li><strong>Fuzzy Search & Fallback</strong>: Excludes mana symbols by trimming crop width to 68%. If the OCR query fails, it automatically strips words from the end of the text sequentially until a match is found.</li>
+            <li><strong>Fuzzy Search & Fallback</strong>: Excludes margins by trimming crop width to 90%. If the OCR query fails, it automatically strips words from the end of the text sequentially until a match is found.</li>
             <li><strong>Rapid-Succession Summoning</strong>: Asynchronously add Normal and Foil printings to your collection. The camera feed stays active, and the page is only reloaded to refresh cards when you close the modal.</li>
+            <li><strong>Session Counter Badge</strong>: Displays a real-time count of cards summoned during the current scanning session next to the modal header.</li>
             <li><strong>Manual Autofill Fallback</strong>: Pre-populates the scanner manual search bar with the OCR output, letting you correct minor typos instantly and press Enter.</li>
             <li><strong>Automatic Update Checker</strong>: Automatically queries the GitHub Releases API. Displays an alert badge in the navigation bar when an update is available.</li>
             <li><strong>One-Click Updater</strong>: Located on the Settings page, click a single button to pull, extract, and update your local repository files to the latest release version.</li>

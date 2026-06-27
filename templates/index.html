@@ -265,16 +265,30 @@
         margin-bottom: 16px;
     }
 
-    /* Foil Card Effect */
-    .card-item.is-foil::after {
-        content: '';
+    /* Holofoil sheen overlay */
+    .foil-sheen-overlay {
         position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(59, 130, 246, 0.08) 50%, rgba(234, 179, 8, 0.08) 100%);
-        pointer-events: none;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            125deg,
+            rgba(255, 0, 128, 0) 0%,
+            rgba(255, 0, 128, 0.1) 20%,
+            rgba(0, 255, 255, 0.15) 40%,
+            rgba(255, 255, 0, 0.1) 60%,
+            rgba(0, 255, 0, 0.05) 80%,
+            rgba(255, 0, 128, 0) 100%
+        );
+        background-size: 200% 200%;
+        background-position: 50% 50%;
         mix-blend-mode: color-dodge;
-        opacity: 0.95;
-        z-index: 2;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease, background-position 0.1s ease;
+        z-index: 5;
+        border-radius: inherit;
     }
     
     .foil-badge {
@@ -1897,6 +1911,11 @@
         modal.scrollTop = 0;
         document.body.style.overflow = 'hidden';
 
+        const modalFoilSheen = document.getElementById('modalFoilSheen');
+        if (modalFoilSheen) {
+            modalFoilSheen.style.display = 'none';
+        }
+
         // Populate Library Stats Panel
         const statsContainer = document.getElementById('modalLibraryStatsContainer');
         const statsQty = document.getElementById('modalLibraryQty');
@@ -1914,6 +1933,10 @@
 
                 statsQty.textContent = qty;
                 statsFoil.style.display = isFoil ? 'inline-block' : 'none';
+                const modalFoilSheen = document.getElementById('modalFoilSheen');
+                if (modalFoilSheen) {
+                    modalFoilSheen.style.display = isFoil ? 'block' : 'none';
+                }
                 statsValue.textContent = `$${(price * qty).toFixed(2)}`;
 
                 const diff = (price - acqPrice) * qty;
@@ -2447,6 +2470,69 @@
         setViewMode(savedViewMode);
     }
 
+    function initFoilEffects() {
+        const foilItems = document.querySelectorAll('.card-item.is-foil');
+        foilItems.forEach(card => {
+            if (card.dataset.foilBound === 'true') return;
+            card.dataset.foilBound = 'true';
+            
+            const wrapper = card.querySelector('.card-image-wrapper');
+            if (wrapper && !wrapper.querySelector('.foil-sheen-overlay')) {
+                const sheen = document.createElement('div');
+                sheen.className = 'foil-sheen-overlay';
+                wrapper.appendChild(sheen);
+            }
+            
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const sheen = card.querySelector('.foil-sheen-overlay');
+                if (sheen) {
+                    sheen.style.opacity = '0.85';
+                    const pctX = (x / rect.width) * 100;
+                    const pctY = (y / rect.height) * 100;
+                    sheen.style.backgroundPosition = `${pctX}% ${pctY}%`;
+                }
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                const sheen = card.querySelector('.foil-sheen-overlay');
+                if (sheen) {
+                    sheen.style.opacity = '0';
+                    sheen.style.backgroundPosition = '50% 50%';
+                }
+            });
+        });
+    }
+
+    // Initialize on page load
+    initFoilEffects();
+
+    // Bind details modal image hover sheen shifts
+    const modalImageContainer = document.getElementById('modalCardImage') ? document.getElementById('modalCardImage').parentElement : null;
+    if (modalImageContainer) {
+        modalImageContainer.addEventListener('mousemove', e => {
+            const sheen = document.getElementById('modalFoilSheen');
+            if (sheen && sheen.style.display !== 'none') {
+                const rect = modalImageContainer.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                sheen.style.opacity = '0.85';
+                const pctX = (x / rect.width) * 100;
+                const pctY = (y / rect.height) * 100;
+                sheen.style.backgroundPosition = `${pctX}% ${pctY}%`;
+            }
+        });
+        modalImageContainer.addEventListener('mouseleave', () => {
+            const sheen = document.getElementById('modalFoilSheen');
+            if (sheen) {
+                sheen.style.opacity = '0';
+                sheen.style.backgroundPosition = '50% 50%';
+            }
+        });
+    }
+
     {% if needs_auto_refresh %}
     // Daily auto price refresh
     setTimeout(() => {
@@ -2475,7 +2561,10 @@
         <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
             <!-- Left Side: Large Card Image -->
             <div style="flex: 1; min-width: 220px; display: flex; align-items: center; justify-content: center;">
-                <img id="modalCardImage" src="" alt="Card Preview" style="width: 100%; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 20px rgba(0,0,0,0.5);">
+                <div style="position: relative; width: 100%; max-width: 100%; display: inline-block; border-radius: 12px; overflow: hidden;">
+                    <img id="modalCardImage" src="" alt="Card Preview" style="width: 100%; display: block; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 20px rgba(0,0,0,0.5); border-radius: inherit;">
+                    <div id="modalFoilSheen" class="foil-sheen-overlay" style="display: none;"></div>
+                </div>
             </div>
             
             <!-- Right Side: Details -->
