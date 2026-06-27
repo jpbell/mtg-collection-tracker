@@ -56,6 +56,13 @@ Designed with a sleek, responsive dark glassmorphism user interface and backed b
 
 ![The Elite Showcase](screenshots/showcase.png)
 
+### 8. 📷 Asynchronous Rapid-Fire Card Scanner & Updater
+* **Card Scanner Modal**: Accessible directly from the Summon drawer, letting you scan cards using your webcam or photo upload.
+* **Smart OCR Title Cropping**: Captures the card title area using a horizontal guide box. Cuts off the right 32% of the bar to exclude mana cost symbols, and automatically inverts colors for dark-background cards (like Black cards and Planeswalkers) so Tesseract OCR always gets dark text on a light background.
+* **Rapid-Succession Summoning**: Add Normal and Foil printings in quick succession using background fetch requests. The camera remains active, and page reloading is deferred until you close the modal.
+* **Manual Input Fallback**: Pre-fills the search input field with the detected OCR text, allowing you to edit minor typos and hit Enter without retyping the entire card name.
+* **One-Click Codebase Updater**: Automatically queries the GitHub Releases API. Displays an "Update Available" notification badge in the navigation bar and allows updating the entire local codebase to the latest release version directly from the Settings page.
+
 ---
 
 ## 🛠️ Tech Stack

@@ -107,10 +107,11 @@
         </p>
         <ul class="guide-list">
             <li><strong>Summon Card</strong>: Toggle the **Summon** button to slide open a compact inline form, then add a card using its official 3-letter Set Code (e.g. <span class="code-span">NEO</span>) and Collector Number (e.g. <span class="code-span">15</span>). Your Summon drawer state and last entered Set Code are automatically saved to allow fast, mouse-free consecutive entries (the system auto-focuses the Collector # field on page reload).</li>
-            <li><strong>Foil Printings</strong>: Check the **Foil** option before summoning to track physical foil cards and calculate foil pricing.</li>
-            <li><strong>Sort & Filter</strong>: Sort your collection cards dynamically by Name, Price, Quantity, CMC mana cost, or Collector Number using the dropdown menu. You can toggle the **Filters** button to reveal a collapsible Advanced Filters panel. This drawer lets you multi-select options across Colors, Sets, Types, Rarities, Finish (Foil/Non-Foil), and Legality (Commander eligibility and Banned Everywhere filter) simultaneously. Your filter state is saved locally.</li>
-            <li><strong>Real-time Value Snapshot</strong>: Track your library's financial value over time. Automatically takes periodic snapshots of your total value.</li>
-            <li><strong>Price Refresh</strong>: Refresh card pricing on the Dashboard in bulk via Scryfall. The Dashboard displays the exact local timestamp of the last successful refresh.</li>
+            <li><strong>Card View Modes</strong>: Toggle between **Grid**, **Images**, or **List** views on the main collection tab to customize how your cards are displayed (card details layout, raw artwork, or compact spreadsheet table).</li>
+            <li><strong>Foil & Promo Tracking</strong>: Check the **Foil** option before summoning to track physical foil pricing. Badges are displayed for promo cards (e.g., FNM promos, pre-releases, and bundle promos).</li>
+            <li><strong>Value Gain/Loss Indicators</strong>: View positive green or negative red percentage change indicators next to card prices, comparing current values against the last saved database snapshot.</li>
+            <li><strong>Daily Value History</strong>: View a structured daily record of your collection value on the dashboard, tracking how your portfolio grows or fluctuates over time.</li>
+            <li><strong>Daily Auto-Refresh</strong>: The application automatically runs a price sync on your first login of the day to keep your collection valuation up to date.</li>
         </ul>
     </div>
 
@@ -294,6 +295,26 @@
             <li><strong>Milestone XP Progress</strong>: Visual XP-style progress bar showing how close your Top 10 collection value is to major milestones ($100, $500, $1000, etc.).</li>
             <li><strong>3D Tilt & Foil Shimmer</strong>: Showcase cards tilt dynamically based on cursor position. Foil prints shimmer with mouse-responsive holographic sheen shifts.</li>
             <li><strong>Interactive Format Inspector</strong>: Visitors can click cards to inspect properties (CMC, Mana Cost, Printing, Rarity) and view a grid of exact format legalities (Standard, Commander, Modern, etc.) queried live from Scryfall.</li>
+        </ul>
+    </div>
+
+    <!-- Section 12: Card Scanner & Updates -->
+    <div class="guide-card">
+        <div>
+            <div class="guide-icon">📷</div>
+            <h3 class="guide-title">Card Scanner & Updates</h3>
+        </div>
+        <p class="guide-body">
+            Scan physical cards into your collection and manage codebase updates.
+        </p>
+        <ul class="guide-list">
+            <li><strong>OCR Title Scanner</strong>: Hold your card up to your webcam or upload a photo to scan it. The system crops and upscales the title area by 2x for high OCR precision.</li>
+            <li><strong>Auto-Contrast & Inversion</strong>: Dynamically detects card brightness. Automatically inverts pixels for dark-background cards (like Black cards and Planeswalkers) so Tesseract always gets dark text on a light background.</li>
+            <li><strong>Fuzzy Search & Fallback</strong>: Excludes mana symbols by trimming crop width to 68%. If the OCR query fails, it automatically strips words from the end of the text sequentially until a match is found.</li>
+            <li><strong>Rapid-Succession Summoning</strong>: Asynchronously add Normal and Foil printings to your collection. The camera feed stays active, and the page is only reloaded to refresh cards when you close the modal.</li>
+            <li><strong>Manual Autofill Fallback</strong>: Pre-populates the scanner manual search bar with the OCR output, letting you correct minor typos instantly and press Enter.</li>
+            <li><strong>Automatic Update Checker</strong>: Automatically queries the GitHub Releases API. Displays an alert badge in the navigation bar when an update is available.</li>
+            <li><strong>One-Click Updater</strong>: Located on the Settings page, click a single button to pull, extract, and update your local repository files to the latest release version.</li>
         </ul>
     </div>
 </div>
