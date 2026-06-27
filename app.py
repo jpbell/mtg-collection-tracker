@@ -57,6 +57,16 @@ def check_auth():
     if not session.get('user_id'):
         return redirect(url_for('login'))
 
+@app.context_processor
+def inject_pending_comments_count():
+    if session.get('user_id') and is_current_user_site_admin():
+        try:
+            pending_count = ShowcaseComment.query.filter_by(is_approved=False).count()
+            return {'pending_comments_count': pending_count}
+        except Exception:
+            pass
+    return {'pending_comments_count': 0}
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'mtg_collection.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

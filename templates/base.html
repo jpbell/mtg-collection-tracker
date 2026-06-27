@@ -171,6 +171,48 @@
             align-items: center;
             gap: 6px;
             transition: all 0.2s;
+            position: relative;
+        }
+
+        .menu-alert-dot {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-gold);
+            border: 2px solid #0b0914;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+            pointer-events: none;
+            animation: pulse-alert 2s infinite;
+        }
+
+        @keyframes pulse-alert {
+            0% {
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+            }
+        }
+
+        .pending-badge {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: var(--accent-gold);
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
         }
 
         .menu-toggle-btn:hover {
@@ -738,6 +780,9 @@
                         <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
                     </svg>
                     <span>Menu</span>
+                    {% if pending_comments_count and pending_comments_count > 0 %}
+                        <span class="menu-alert-dot"></span>
+                    {% endif %}
                 </button>
             {% else %}
                 <a href="/login" class="menu-toggle-btn" style="text-decoration: none; padding: 6px 12px; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">
@@ -758,7 +803,12 @@
                 <a href="/rules">Format Rules</a>
                 <a href="/tokens">Tokens</a>
                 <a href="/art_cards">Art Cards</a>
-                <a href="/showcases">⚜️ Showcases</a>
+                <a href="/showcases" style="justify-content: space-between;">
+                    <span>⚜️ Showcases</span>
+                    {% if pending_comments_count and pending_comments_count > 0 %}
+                        <span class="pending-badge">{{ pending_comments_count }}</span>
+                    {% endif %}
+                </a>
                 <a href="/guide">Guide</a>
                 <a href="/releases">Release Notes</a>
                 <a href="/settings">Settings</a>
