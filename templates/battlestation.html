@@ -1,0 +1,978 @@
+{% extends "base.html" %}
+
+{% block title %}Battle Station - The Magicvault{% endblock %}
+
+{% block content %}
+<style>
+    .bs-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 50px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .bs-header {
+        border-bottom: 2px solid rgba(168, 85, 247, 0.2);
+        padding-bottom: 12px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* ---- Configuration Panel ---- */
+    .bs-config-card {
+        background: rgba(20, 16, 36, 0.45);
+        border: 1px solid var(--panel-border);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(12px);
+        max-width: 600px;
+        margin: 40px auto;
+        animation: bsFadeIn 0.4s ease;
+    }
+
+    .bs-form-group {
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .bs-form-group label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .bs-input, .bs-select {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--panel-border);
+        color: var(--text-main);
+        padding: 12px;
+        border-radius: 10px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .bs-input:focus, .bs-select:focus {
+        border-color: var(--accent-purple);
+    }
+
+    .bs-player-setup-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 10px;
+        padding: 10px;
+        background: rgba(255,255,255,0.01);
+        border: 1px solid rgba(255,255,255,0.03);
+        border-radius: 10px;
+    }
+
+    /* ---- Battlefield View Layout ---- */
+    .bs-battlefield {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 20px;
+        align-items: start;
+    }
+
+    .bs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    /* Player Box Styling */
+    .bs-player-box {
+        background: rgba(20, 16, 36, 0.45);
+        border: 1px solid var(--panel-border);
+        border-radius: 18px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        position: relative;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+        backdrop-filter: blur(10px);
+    }
+
+    .bs-player-box.active-turn {
+        border-color: var(--accent-purple);
+        box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+        transform: translateY(-2px);
+    }
+
+    .bs-player-name-display {
+        font-family: 'Cinzel', serif;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-main);
+        background: none;
+        border: none;
+        border-bottom: 1px dashed rgba(255,255,255,0.1);
+        width: 100%;
+        padding-bottom: 2px;
+        outline: none;
+        margin: 0;
+    }
+
+    .bs-player-name-display:focus {
+        border-bottom-color: var(--accent-cyan);
+    }
+
+    /* Huge Life display */
+    .bs-life-display-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        position: relative;
+        margin: 10px 0;
+    }
+
+    .bs-life-num {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        line-height: 1;
+        min-width: 90px;
+        text-align: center;
+        text-shadow: 0 0 10px rgba(255,255,255,0.05);
+        user-select: none;
+    }
+
+    .bs-life-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 1px solid var(--panel-border);
+        background: rgba(255,255,255,0.03);
+        color: var(--text-main);
+        font-size: 1.5rem;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        user-select: none;
+    }
+
+    .bs-life-btn:active {
+        transform: scale(0.92);
+    }
+
+    .bs-life-btn.plus:hover {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: var(--accent-green);
+        color: var(--accent-green);
+    }
+
+    .bs-life-btn.minus:hover {
+        background: rgba(244, 63, 94, 0.1);
+        border-color: var(--accent-rose);
+        color: var(--accent-rose);
+    }
+
+    .bs-quick-life-adjusters {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: -6px;
+    }
+
+    .bs-quick-life-btn {
+        font-size: 0.72rem;
+        padding: 3px 8px;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    .bs-quick-life-btn:hover {
+        color: var(--text-main);
+        border-color: rgba(255,255,255,0.15);
+    }
+
+    /* Sub-panels for Counters */
+    .bs-counters-tabs {
+        border-top: 1px solid rgba(255,255,255,0.05);
+        padding-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .bs-counter-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.82rem;
+        background: rgba(255,255,255,0.01);
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.02);
+    }
+
+    .bs-counter-title {
+        color: var(--text-muted);
+        font-weight: 550;
+    }
+
+    .bs-counter-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .bs-counter-val {
+        font-family: monospace;
+        font-weight: bold;
+        font-size: 0.95rem;
+        color: var(--text-main);
+        min-width: 18px;
+        text-align: center;
+    }
+
+    .bs-mini-btn {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid var(--panel-border);
+        background: rgba(255,255,255,0.02);
+        color: var(--text-main);
+        font-size: 0.8rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .bs-mini-btn:hover {
+        background: rgba(255,255,255,0.08);
+    }
+
+    /* Commander Damage Panel */
+    .bs-cmd-dmg-btn-toggle {
+        font-size: 0.75rem;
+        background: none;
+        border: 1px solid rgba(168, 85, 247, 0.2);
+        color: var(--accent-purple);
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        align-self: center;
+        margin-top: 4px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .bs-cmd-dmg-btn-toggle:hover {
+        background: rgba(168, 85, 247, 0.05);
+    }
+
+    .bs-cmd-dmg-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 4px;
+        background: rgba(0,0,0,0.15);
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.02);
+    }
+
+    /* ---- Sidebar / Utility Drawer ---- */
+    .bs-sidebar {
+        background: rgba(20, 16, 36, 0.45);
+        border: 1px solid var(--panel-border);
+        border-radius: 18px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(10px);
+    }
+
+    .bs-timer-display {
+        font-family: monospace;
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--text-main);
+        text-align: center;
+        letter-spacing: 1px;
+    }
+
+    .bs-logs-box {
+        max-height: 180px;
+        overflow-y: auto;
+        font-size: 0.78rem;
+        background: rgba(0,0,0,0.25);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .bs-log-item {
+        color: var(--text-muted);
+        border-bottom: 1px dashed rgba(255,255,255,0.02);
+        padding-bottom: 4px;
+        line-height: 1.3;
+    }
+
+    .bs-log-item strong {
+        color: var(--accent-cyan);
+    }
+
+    /* Deck Badge Colors */
+    .color-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        border: 1px solid rgba(255,255,255,0.15);
+    }
+    .dot-W { background: #f3f4f6; }
+    .dot-U { background: #3b82f6; }
+    .dot-B { background: #4b5563; }
+    .dot-R { background: #ef4444; }
+    .dot-G { background: #10b981; }
+
+    @keyframes bsFadeIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---- Mobile Responsiveness ---- */
+    @media (max-width: 992px) {
+        .bs-battlefield {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .bs-sidebar {
+            order: -1; /* Place sidebar (timer/roller) on top of the list for quick access */
+        }
+    }
+
+    @media (max-width: 576px) {
+        .bs-grid {
+            grid-template-columns: 1fr; /* Stacks player cards cleanly */
+        }
+        
+        .bs-life-num {
+            font-size: 3rem;
+            min-width: 70px;
+        }
+
+        .bs-life-btn {
+            width: 40px;
+            height: 40px;
+        }
+
+        .bs-config-card {
+            padding: 16px;
+            margin: 20px 10px;
+        }
+    }
+
+    /* Overlay menu toggle for mobile drawer */
+    .bs-mobile-utility-toggle {
+        display: none;
+        position: fixed;
+        bottom: 16px;
+        right: 16px;
+        background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+        color: #fff;
+        border: none;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        box-shadow: 0 6px 20px rgba(6,182,212,0.4);
+        z-index: 1000;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+
+    @media (max-width: 992px) {
+        .bs-mobile-utility-toggle {
+            display: flex;
+        }
+        .bs-sidebar.mobile-collapsed {
+            display: none;
+        }
+        .bs-sidebar.mobile-expanded {
+            display: flex;
+            position: fixed;
+            top: 60px;
+            left: 10px;
+            right: 10px;
+            bottom: 80px;
+            z-index: 999;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            overflow-y: auto;
+            border-color: var(--accent-cyan);
+        }
+    }
+</style>
+
+<div class="bs-container">
+    <!-- Header -->
+    <div class="bs-header">
+        <h1 style="margin: 0; border: none; padding: 0;">⚔️ Battle Station</h1>
+        <button id="endGameBtn" class="btn delete-link" style="display: none; font-size: 0.85rem;" onclick="endGame()">Quit Game</button>
+    </div>
+
+    <!-- Game Setup Panel -->
+    <div id="setup-panel" class="bs-config-card">
+        <h2 style="font-family: 'Cinzel', serif; font-size: 1.4rem; color: var(--accent-purple); margin-top: 0; margin-bottom: 20px; text-align: center;">Assemble Duel</h2>
+        
+        <div class="bs-form-group">
+            <label for="formatSelect">Game Format</label>
+            <select id="formatSelect" class="bs-select" onchange="onFormatChange()">
+                <option value="Commander">Commander (EDH) — 40 Life</option>
+                <option value="Brawl">Brawl — 30 Life</option>
+                <option value="Standard">Standard / Modern / Legacy — 20 Life</option>
+                <option value="TwoHeaded">Two-Headed Giant — 30 Life</option>
+                <option value="Custom">Custom Format</option>
+            </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="bs-form-group">
+                <label for="playersCountInput">Players</label>
+                <input type="number" id="playersCountInput" class="bs-input" min="2" max="6" value="4" onchange="rebuildPlayersSetup()">
+            </div>
+            <div class="bs-form-group">
+                <label for="startingLifeInput">Starting Life</label>
+                <input type="number" id="startingLifeInput" class="bs-input" min="1" value="40">
+            </div>
+        </div>
+
+        <h4 style="margin: 16px 0 8px 0; font-family: 'Cinzel', serif; font-size: 0.95rem; color: var(--text-muted);">Player Library Association</h4>
+        <div id="players-setup-container">
+            <!-- Dynamically populated rows for names/decks -->
+        </div>
+
+        <button class="btn" style="width: 100%; margin-top: 20px; font-weight: 700; background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));" onclick="startGame()">
+            <span>Enter Battlefield</span>
+        </button>
+    </div>
+
+    <!-- Active Battlefield Tracking Grid -->
+    <div id="battlefield-panel" class="bs-battlefield" style="display: none;">
+        <!-- Player Grid -->
+        <div id="playersGrid" class="bs-grid">
+            <!-- Dynamically populated active player boxes -->
+        </div>
+
+        <!-- Utilities (Timer, Roller, Log) -->
+        <div id="bsSidebar" class="bs-sidebar mobile-collapsed">
+            <!-- Timer widget -->
+            <div>
+                <h4 style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; text-align: center; letter-spacing: 0.5px;">Turn Clock</h4>
+                <div id="timerDisplay" class="bs-timer-display">00:00</div>
+                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 8px;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; height: auto;" onclick="toggleTimer()">Play/Pause</button>
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; height: auto;" onclick="resetTimer()">Reset</button>
+                </div>
+            </div>
+
+            <!-- Dice Roller / Coin Flip -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Fate Decider</h4>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                    <button class="bs-quick-life-btn" onclick="rollDie(6)">Roll D6</button>
+                    <button class="bs-quick-life-btn" onclick="rollDie(20)">Roll D20</button>
+                    <button class="bs-quick-life-btn" onclick="flipCoin()">Flip Coin</button>
+                </div>
+                <div id="rollerResult" style="margin-top: 8px; text-align: center; font-size: 0.9rem; font-weight: bold; color: var(--accent-gold); min-height: 20px;"></div>
+            </div>
+
+            <!-- Turn tracking controls -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Turn order</h4>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;" onclick="nextTurn()">Pass Turn ➔</button>
+                </div>
+            </div>
+
+            <!-- Game Logs -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px; flex-grow: 1; display: flex; flex-direction: column;">
+                <h4 style="margin: 0 0 8px 0; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Duel Chronicles</h4>
+                <div id="logsBox" class="bs-logs-box">
+                    <!-- Logs inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Drawer Button Toggle -->
+<button class="bs-mobile-utility-toggle" onclick="toggleMobileSidebar()">
+    ⏱️
+</button>
+
+<script>
+    // Saved user decks list
+    const userDecks = {{ decks|tojson|safe if decks else '[]' }};
+    
+    // Players State
+    let players = [];
+    let format = 'Commander';
+    let startingLife = 40;
+    let activePlayerTurnIndex = 0;
+    
+    // Timer state
+    let timerInterval = null;
+    let secondsElapsed = 0;
+    let timerRunning = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Highlight active nav link
+        const navLinks = document.querySelectorAll('.nav-links a, .nav-links-dropdown a');
+        navLinks.forEach(link => {
+            if (link.getAttribute('href') === '/battlestation') {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
+
+        // Initialize players setup view
+        rebuildPlayersSetup();
+    });
+
+    function onFormatChange() {
+        const fmtSelect = document.getElementById('formatSelect');
+        const playersInput = document.getElementById('playersCountInput');
+        const lifeInput = document.getElementById('startingLifeInput');
+        
+        format = fmtSelect.value;
+        
+        if (format === 'Commander') {
+            playersInput.value = 4;
+            lifeInput.value = 40;
+        } else if (format === 'Brawl') {
+            playersInput.value = 4;
+            lifeInput.value = 30;
+        } else if (format === 'Standard') {
+            playersInput.value = 2;
+            lifeInput.value = 20;
+        } else if (format === 'TwoHeaded') {
+            playersInput.value = 2; // 2 Teams
+            lifeInput.value = 30;
+        }
+        
+        rebuildPlayersSetup();
+    }
+
+    function rebuildPlayersSetup() {
+        const container = document.getElementById('players-setup-container');
+        const count = parseInt(document.getElementById('playersCountInput').value) || 2;
+        
+        container.innerHTML = '';
+        
+        for (let i = 1; i <= count; i++) {
+            const row = document.createElement('div');
+            row.className = 'bs-player-setup-row';
+            
+            // Name placeholder
+            const nameLabel = format === 'TwoHeaded' ? `Team ${i} Name` : `Player ${i} Name`;
+            const namePlaceholder = format === 'TwoHeaded' ? `Team ${i}` : `Player ${i}`;
+            
+            // Generate select deck options
+            let deckOptions = '<option value="">-- No Deck --</option>';
+            userDecks.forEach(d => {
+                deckOptions += `<option value="${d.id}">${d.name} (${d.format})</option>`;
+            });
+
+            row.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-size: 0.72rem; color: var(--text-muted);">${nameLabel}</label>
+                    <input type="text" id="setupPlayerName_${i}" class="bs-input" style="padding: 8px;" value="${namePlaceholder}">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-size: 0.72rem; color: var(--text-muted);">Load Deck</label>
+                    <select id="setupPlayerDeck_${i}" class="bs-select" style="padding: 8px;" onchange="onSetupDeckChange(${i})">
+                        ${deckOptions}
+                    </select>
+                </div>
+            `;
+            container.appendChild(row);
+        }
+    }
+
+    function onSetupDeckChange(playerIndex) {
+        const deckSelect = document.getElementById(`setupPlayerDeck_${playerIndex}`);
+        const nameInput = document.getElementById(`setupPlayerName_${playerIndex}`);
+        const selectedDeckId = parseInt(deckSelect.value);
+        
+        if (selectedDeckId) {
+            const deck = userDecks.find(d => d.id === selectedDeckId);
+            if (deck && nameInput.value.startsWith('Player')) {
+                nameInput.value = deck.name;
+            }
+        }
+    }
+
+    // Toggle Mobile utility sidebar
+    function toggleMobileSidebar() {
+        const sidebar = document.getElementById('bsSidebar');
+        if (sidebar.classList.contains('mobile-collapsed')) {
+            sidebar.classList.remove('mobile-collapsed');
+            sidebar.classList.add('mobile-expanded');
+        } else {
+            sidebar.classList.remove('mobile-expanded');
+            sidebar.classList.add('mobile-collapsed');
+        }
+    }
+
+    // Start Game
+    function startGame() {
+        const count = parseInt(document.getElementById('playersCountInput').value) || 2;
+        startingLife = parseInt(document.getElementById('startingLifeInput').value) || 20;
+        
+        players = [];
+        
+        for (let i = 1; i <= count; i++) {
+            const name = document.getElementById(`setupPlayerName_${i}`).value.trim() || `Player ${i}`;
+            const deckId = parseInt(document.getElementById(`setupPlayerDeck_${i}`).value) || null;
+            
+            let loadedColors = [];
+            if (deckId) {
+                const deck = userDecks.find(d => d.id === deckId);
+                if (deck) loadedColors = deck.colors;
+            }
+            
+            // Build Commander Damage registry
+            const cmdDamage = {};
+            for (let j = 1; j <= count; j++) {
+                if (i !== j) cmdDamage[j] = 0;
+            }
+
+            players.push({
+                id: i,
+                name: name,
+                life: startingLife,
+                poison: 0,
+                energy: 0,
+                tax: 0,
+                cmdDamage: cmdDamage,
+                deckId: deckId,
+                colors: loadedColors
+            });
+        }
+        
+        activePlayerTurnIndex = 0;
+        document.getElementById('setup-panel').style.display = 'none';
+        document.getElementById('battlefield-panel').style.display = 'grid';
+        document.getElementById('endGameBtn').style.display = 'block';
+        
+        // Clear log
+        document.getElementById('logsBox').innerHTML = '';
+        addLog("Game Started. Turn 1 begins.");
+        
+        renderActivePlayers();
+        resetTimer();
+        startTimer();
+    }
+
+    function endGame() {
+        if (confirm('Quit this duel and return to config? All active game counters will be lost.')) {
+            stopTimer();
+            document.getElementById('battlefield-panel').style.display = 'none';
+            document.getElementById('setup-panel').style.display = 'block';
+            document.getElementById('endGameBtn').style.display = 'none';
+        }
+    }
+
+    // Dynamic Player boxes rendering
+    function renderActivePlayers() {
+        const grid = document.getElementById('playersGrid');
+        grid.innerHTML = '';
+        
+        players.forEach((p, idx) => {
+            const pBox = document.createElement('div');
+            pBox.id = `player-card-${p.id}`;
+            pBox.className = `bs-player-box ${idx === activePlayerTurnIndex ? 'active-turn' : ''}`;
+            
+            // Create color identity dots
+            let colorDotsHtml = '';
+            if (p.colors && p.colors.length > 0) {
+                p.colors.forEach(col => {
+                    colorDotsHtml += `<span class="color-dot dot-${col}" title="${col}"></span> `;
+                });
+            }
+
+            // Build commander damage tracker controls
+            let cmdDamageHtml = '';
+            if (format === 'Commander' || format === 'Brawl') {
+                cmdDamageHtml += `
+                    <button class="bs-cmd-dmg-btn-toggle" onclick="toggleCmdDmgPanel(${p.id})">⚔️ Toggle Commander Damage Received</button>
+                    <div id="cmd-dmg-panel-${p.id}" class="bs-cmd-dmg-grid" style="display: none;">
+                        <span style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 4px; display: block; font-weight: bold; text-transform: uppercase;">From Opponents:</span>
+                `;
+                
+                players.forEach(opp => {
+                    if (opp.id !== p.id) {
+                        const dmgVal = p.cmdDamage[opp.id] || 0;
+                        cmdDamageHtml += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; background: rgba(0,0,0,0.15); padding: 4px 8px; border-radius: 6px;">
+                                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;" title="${opp.name}">${opp.name}</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button class="bs-mini-btn" onclick="adjustCmdDamage(${p.id}, ${opp.id}, -1)">-</button>
+                                    <span id="cmd-dmg-display-${p.id}-${opp.id}" style="font-family: monospace; font-weight: bold; min-width: 14px; text-align: center; color: ${dmgVal >= 21 ? 'var(--accent-rose)' : 'var(--text-main)'};">${dmgVal}</span>
+                                    <button class="bs-mini-btn" onclick="adjustCmdDamage(${p.id}, ${opp.id}, 1)">+</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+                cmdDamageHtml += `</div>`;
+            }
+
+            pBox.innerHTML = `
+                <!-- Player Name Header -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <input type="text" class="bs-player-name-display" value="${p.name}" onchange="updatePlayerName(${p.id}, this.value)">
+                    <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        ${colorDotsHtml}
+                    </div>
+                </div>
+
+                <!-- Life Counters -->
+                <div class="bs-life-display-wrapper">
+                    <button class="bs-life-btn minus" onclick="adjustLife(${p.id}, -1)">-</button>
+                    <span id="life-val-${p.id}" class="bs-life-num">${p.life}</span>
+                    <button class="bs-life-btn plus" onclick="adjustLife(${p.id}, 1)">+</button>
+                </div>
+
+                <!-- Quick Adjustments -->
+                <div class="bs-quick-life-adjusters">
+                    <button class="bs-quick-life-btn" onclick="adjustLife(${p.id}, -5)">-5</button>
+                    <button class="bs-quick-life-btn" onclick="adjustLife(${p.id}, 5)">+5</button>
+                </div>
+
+                <!-- Auxiliary Counters (Poison, Energy, Tax, Commander Damage) -->
+                <div class="bs-counters-tabs">
+                    <!-- Poison -->
+                    <div class="bs-counter-row">
+                        <span class="bs-counter-title">☠️ Poison Counters</span>
+                        <div class="bs-counter-controls">
+                            <button class="bs-mini-btn" onclick="adjustCounter(${p.id}, 'poison', -1)">-</button>
+                            <span id="poison-val-${p.id}" class="bs-counter-val">${p.poison}</span>
+                            <button class="bs-mini-btn" onclick="adjustCounter(${p.id}, 'poison', 1)">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Energy -->
+                    <div class="bs-counter-row">
+                        <span class="bs-counter-title">⚡ Energy Counters</span>
+                        <div class="bs-counter-controls">
+                            <button class="bs-mini-btn" onclick="adjustCounter(${p.id}, 'energy', -1)">-</button>
+                            <span id="energy-val-${p.id}" class="bs-counter-val">${p.energy}</span>
+                            <button class="bs-mini-btn" onclick="adjustCounter(${p.id}, 'energy', 1)">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Commander Tax -->
+                    ${(format === 'Commander' || format === 'Brawl') ? `
+                    <div class="bs-counter-row">
+                        <span class="bs-counter-title">👑 Commander Tax</span>
+                        <div class="bs-counter-controls">
+                            <button class="bs-mini-btn" onclick="adjustCounter(${p.id}, 'tax', -2)">-2</button>
+                            <span id="tax-val-${p.id}" class="bs-counter-val">${p.tax}</span>
+                            <button class="bs-mini-btn" onclick="adjustCounter(${p.id}, 'tax', 2)">+2</button>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Commander Damage Matrix -->
+                    ${cmdDamageHtml}
+                </div>
+            `;
+            grid.appendChild(pBox);
+        });
+    }
+
+    function updatePlayerName(playerId, name) {
+        const p = players.find(x => x.id === playerId);
+        if (p) {
+            const oldName = p.name;
+            p.name = name.trim() || `Player ${playerId}`;
+            addLog(`Renamed: <strong>${oldName}</strong> is now <strong>${p.name}</strong>.`);
+        }
+    }
+
+    // Toggle Collapsible Opponent Commander Damage panel
+    function toggleCmdDmgPanel(playerId) {
+        const panel = document.getElementById(`cmd-dmg-panel-${playerId}`);
+        if (panel.style.display === 'none') {
+            panel.style.display = 'flex';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    // Adjust Life
+    function adjustLife(playerId, amount) {
+        const p = players.find(x => x.id === playerId);
+        if (p) {
+            p.life = Math.max(0, p.life + amount);
+            document.getElementById(`life-val-${playerId}`).innerText = p.life;
+            
+            const modeSign = amount > 0 ? '+' : '';
+            addLog(`<strong>${p.name}</strong> life: ${p.life} (${modeSign}${amount})`);
+            
+            // Color red/green flashes based on changes
+            const displayEl = document.getElementById(`life-val-${playerId}`);
+            displayEl.style.color = amount > 0 ? 'var(--accent-green)' : 'var(--accent-rose)';
+            setTimeout(() => {
+                displayEl.style.color = '';
+            }, 500);
+        }
+    }
+
+    // Adjust Other standard counters
+    function adjustCounter(playerId, type, amount) {
+        const p = players.find(x => x.id === playerId);
+        if (p) {
+            p[type] = Math.max(0, p[type] + amount);
+            document.getElementById(`${type}-val-${playerId}`).innerText = p[type];
+            
+            const icon = type === 'poison' ? '☠️' : (type === 'energy' ? '⚡' : '👑');
+            const actionText = amount > 0 ? 'added' : 'removed';
+            addLog(`${icon} ${actionText} ${Math.abs(amount)} ${type} counter(s) to <strong>${p.name}</strong> (Total: ${p[type]})`);
+        }
+    }
+
+    // Adjust Commander Damage received from opponent
+    function adjustCmdDamage(playerId, oppId, amount) {
+        const p = players.find(x => x.id === playerId);
+        const opp = players.find(x => x.id === oppId);
+        
+        if (p && opp) {
+            const current = p.cmdDamage[oppId] || 0;
+            const newVal = Math.max(0, current + amount);
+            p.cmdDamage[oppId] = newVal;
+            
+            const displayEl = document.getElementById(`cmd-dmg-display-${playerId}-${oppId}`);
+            displayEl.innerText = newVal;
+            
+            if (newVal >= 21) {
+                displayEl.style.color = 'var(--accent-rose)';
+                addLog(`🚨 Warning: <strong>${p.name}</strong> has received ${newVal} Commander Damage from <strong>${opp.name}</strong> (21+ triggers defeat!)`);
+            } else {
+                displayEl.style.color = 'var(--text-main)';
+                addLog(`⚔️ Commander Damage: <strong>${p.name}</strong> took ${newVal} total damage from <strong>${opp.name}</strong>`);
+            }
+            
+            // Automatically deduct life as well
+            adjustLife(playerId, -amount);
+        }
+    }
+
+    // Logs Logger
+    function addLog(message) {
+        const logsBox = document.getElementById('logsBox');
+        const logItem = document.createElement('div');
+        logItem.className = 'bs-log-item';
+        
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        logItem.innerHTML = `<span style="color: var(--accent-gold); font-size: 0.7rem; font-family: monospace;">[${timestamp}]</span> ${message}`;
+        
+        logsBox.appendChild(logItem);
+        logsBox.scrollTop = logsBox.scrollHeight;
+    }
+
+    // Roller Decider
+    function rollDie(sides) {
+        const roll = Math.floor(Math.random() * sides) + 1;
+        document.getElementById('rollerResult').innerText = `🎲 Rolled D${sides}: ${roll}`;
+        addLog(`fate: Rolled D${sides} ➔ <strong>${roll}</strong>`);
+    }
+
+    function flipCoin() {
+        const flip = Math.random() < 0.5 ? 'Heads' : 'Tails';
+        document.getElementById('rollerResult').innerText = `🪙 Coin Flip: ${flip}`;
+        addLog(`fate: Coin Flipped ➔ <strong>${flip}</strong>`);
+    }
+
+    // Pass turn order
+    function nextTurn() {
+        const oldActive = players[activePlayerTurnIndex];
+        document.getElementById(`player-card-${oldActive.id}`).classList.remove('active-turn');
+        
+        activePlayerTurnIndex = (activePlayerTurnIndex + 1) % players.length;
+        
+        const newActive = players[activePlayerTurnIndex];
+        document.getElementById(`player-card-${newActive.id}`).classList.add('active-turn');
+        
+        addLog(`Turn passes to <strong>${newActive.name}</strong>.`);
+        
+        // Reset turn timer
+        secondsElapsed = 0;
+        updateTimerDisplay();
+    }
+
+    // Timer logic
+    function startTimer() {
+        if (!timerInterval) {
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                updateTimerDisplay();
+            }, 1000);
+            timerRunning = true;
+        }
+    }
+
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerRunning = false;
+        }
+    }
+
+    function toggleTimer() {
+        if (timerRunning) {
+            stopTimer();
+            addLog("Turn clock paused.");
+        } else {
+            startTimer();
+            addLog("Turn clock resumed.");
+        }
+    }
+
+    function resetTimer() {
+        secondsElapsed = 0;
+        updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+        const mins = Math.floor(secondsElapsed / 60).toString().padStart(2, '0');
+        const secs = (secondsElapsed % 60).toString().padStart(2, '0');
+        document.getElementById('timerDisplay').innerText = `${mins}:${secs}`;
+    }
+</script>
+{% endblock %}

@@ -1799,6 +1799,27 @@ def claim_wishlist_card(card_id):
     flash(f"Successfully claimed {item.name}! Added to collection and removed from wishlist.", "success")
     return redirect(url_for('view_wishlist'))
 
+@app.route('/battlestation')
+def battle_station():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+    decks = scoped(Deck).all()
+    decks_data = []
+    for d in decks:
+        deck_colors = set()
+        for dc in d.cards:
+            if dc.card and dc.card.colors:
+                for col in dc.card.colors.split(','):
+                    deck_colors.add(col.strip().upper())
+        decks_data.append({
+            'id': d.id,
+            'name': d.name,
+            'format': d.format,
+            'colors': list(deck_colors),
+            'size': sum(dc.quantity for dc in d.cards)
+        })
+    return render_template('battlestation.html', decks=decks_data)
+
 # --- Deck Builder Routes ---
 
 @app.route('/decks')
@@ -3474,6 +3495,7 @@ def showcase_index():
         top_card = vintage_top or modern_top
         comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id, is_approved=True).count()
         pending_comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id, is_approved=False).count()
+        deck_count = Deck.query.filter_by(user_id=u.id).count()
         showcases.append({
             'user': u,
             'total_value': total_val,
@@ -3481,6 +3503,7 @@ def showcase_index():
             'top_card': top_card,
             'comment_count': comment_count,
             'pending_comment_count': pending_comment_count,
+            'deck_count': deck_count,
         })
     # Sort by total value descending
     showcases.sort(key=lambda x: x['total_value'], reverse=True)
@@ -3531,6 +3554,84 @@ def view_showcase(username=None):
             showcase_user_id=user.id, is_approved=False
         ).order_by(ShowcaseComment.created_at.asc()).all()
 
+    user_decks = Deck.query.filter_by(user_id=user.id).all()
+    decks_list = []
+    for deck in user_decks:
+        total_qty = sum(dc.quantity for dc in deck.cards if dc.card)
+        basic_land_names = ['mountain', 'forest', 'plains', 'island', 'swamp', 'waste']
+        type_counts = {
+            'Creature': 0, 'Instant': 0, 'Sorcery': 0, 'Land': 0,
+            'Artifact': 0, 'Enchantment': 0, 'Planeswalker': 0, 'Other': 0
+        }
+        cmc_dist = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, '7+': 0}
+        color_pips = {'W': 0, 'U': 0, 'B': 0, 'R': 0, 'G': 0}
+        
+        deck_cards = []
+        for dc in deck.cards:
+            if not dc.card:
+                continue
+            card = dc.card
+            qty = dc.quantity
+            deck_cards.append({
+                'name': card.name,
+                'quantity': qty,
+                'is_commander': dc.is_commander,
+                'image_url': card.image_url,
+                'type_line': card.type_line or '',
+                'price': card.price or 0.0,
+                'cmc': card.cmc or 0
+            })
+            t_lower = (card.type_line or '').lower()
+            name_lower = (card.name or '').lower()
+            is_land = 'land' in t_lower or name_lower in basic_land_names
+            
+            if is_land:
+                type_counts['Land'] += qty
+            elif 'creature' in t_lower:
+                type_counts['Creature'] += qty
+            elif 'instant' in t_lower:
+                type_counts['Instant'] += qty
+            elif 'sorcery' in t_lower:
+                type_counts['Sorcery'] += qty
+            elif 'planeswalker' in t_lower:
+                type_counts['Planeswalker'] += qty
+            elif 'artifact' in t_lower:
+                type_counts['Artifact'] += qty
+            elif 'enchantment' in t_lower:
+                type_counts['Enchantment'] += qty
+            else:
+                type_counts['Other'] += qty
+                
+            if not is_land:
+                c_val = card.cmc or 0
+                if c_val >= 7:
+                    cmc_dist['7+'] += qty
+                elif c_val in cmc_dist:
+                    cmc_dist[c_val] += qty
+                else:
+                    cmc_dist[0] += qty
+                    
+            m_cost = card.mana_cost or ''
+            for symbol, key in [('{W}', 'W'), ('{U}', 'U'), ('{B}', 'B'), ('{R}', 'R'), ('{G}', 'G')]:
+                pips = m_cost.count(symbol)
+                if pips > 0:
+                    color_pips[key] += pips * qty
+                    
+        decks_list.append({
+            'id': deck.id,
+            'name': deck.name,
+            'description': deck.description or '',
+            'format': deck.format,
+            'wins': deck.wins,
+            'losses': deck.losses,
+            'draws': deck.draws,
+            'total_cards': total_qty,
+            'cards': deck_cards,
+            'type_counts': type_counts,
+            'cmc_distribution': cmc_dist,
+            'color_pips': color_pips
+        })
+
     return render_template('showcase.html',
                            vintage_cards=vintage_cards,
                            modern_cards=modern_cards,
@@ -3540,7 +3641,8 @@ def view_showcase(username=None):
                            showcase_user=user,
                            comments=approved_comments,
                            pending_comments=pending_comments,
-                           is_site_admin=is_admin)
+                           is_site_admin=is_admin,
+                           user_decks=decks_list)
 
 
 @app.route('/showcase/<username>/comment', methods=['POST'])
