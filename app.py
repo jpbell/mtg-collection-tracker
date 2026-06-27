@@ -59,13 +59,14 @@ def check_auth():
 
 @app.context_processor
 def inject_pending_comments_count():
-    if session.get('user_id') and is_current_user_site_admin():
+    is_admin = session.get('user_id') and is_current_user_site_admin()
+    if is_admin:
         try:
             pending_count = ShowcaseComment.query.filter_by(is_approved=False).count()
-            return {'pending_comments_count': pending_count}
+            return {'pending_comments_count': pending_count, 'is_site_admin': True}
         except Exception:
             pass
-    return {'pending_comments_count': 0}
+    return {'pending_comments_count': 0, 'is_site_admin': False}
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'mtg_collection.db')
@@ -2947,12 +2948,14 @@ def showcase_index():
         modern_top = Card.query.filter_by(user_id=u.id, is_modern=True).order_by(Card.price.desc()).first()
         top_card = vintage_top or modern_top
         comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id, is_approved=True).count()
+        pending_comment_count = ShowcaseComment.query.filter_by(showcase_user_id=u.id, is_approved=False).count()
         showcases.append({
             'user': u,
             'total_value': total_val,
             'card_count': card_count,
             'top_card': top_card,
             'comment_count': comment_count,
+            'pending_comment_count': pending_comment_count,
         })
     # Sort by total value descending
     showcases.sort(key=lambda x: x['total_value'], reverse=True)

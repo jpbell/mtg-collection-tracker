@@ -294,6 +294,11 @@
             <div class="si-footer">
                 <span class="si-comment-badge">
                     💬 {{ entry.comment_count }} comment{{ 's' if entry.comment_count != 1 else '' }}
+                    {% if is_site_admin and entry.pending_comment_count > 0 %}
+                        <span style="font-size: 0.72rem; font-weight: 700; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #f59e0b; -webkit-text-fill-color: #f59e0b; padding: 2px 7px; border-radius: 20px; margin-left: 6px; display: inline-flex; align-items: center; vertical-align: middle;">
+                            {{ entry.pending_comment_count }} pending
+                        </span>
+                    {% endif %}
                 </span>
                 <a href="/showcase/{{ entry.user.username }}" class="si-visit-btn">
                     View Showcase →
