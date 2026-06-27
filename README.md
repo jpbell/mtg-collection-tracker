@@ -49,10 +49,12 @@ Designed with a sleek, responsive dark glassmorphism user interface and backed b
 ![Wishlist Tracker](screenshots/wishlist.png)
 
 ### 7. ⚜️ Elite Showcase & Public Sharing
-* **Automated Top 5 Rankings**: Automatically calculates and highlights your top 5 most valuable cards in real-time.
-* **Anonymized Public Sharing**: Publicly accessible page (`/showcase`) that skips security login passcodes to let you share your collection with friends safely.
+* **Showcase Directory**: A public directory (`/showcases`) listing all collectors' showcases ranked by total value, showing top card art, total collection value, card counts, and approved comment counts.
+* **Automated Rankings**: Showcase pages (`/showcase/<username>`) dynamically highlight your top 5 Vintage cards and top 10 Modern cards.
 * **XP Milestone Bar**: Visual progress bar tracking total value towards collecting targets ($100, $500, etc.).
 * **3D Tilt & Foil Shimmer**: Interactive hover tilt animations and detailed overlay stats modal queried from Scryfall.
+* **Showcase Comments**: Allows registered users and anonymous guest visitors to comment on showcases.
+* **Guest Comment Moderation & Alert system**: Guest comments require site admin approval before appearing. The site admin (first registered user) gets active indicators (pulsing Menu button alerts, count badges in the nav dropdown, and directory card badges) whenever guest comments are pending. A dedicated panel on showcase pages allows one-click Approve/Reject actions.
 
 ![The Elite Showcase](screenshots/showcase.png)
 
