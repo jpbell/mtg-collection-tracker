@@ -218,6 +218,75 @@
     .scrollable-panel::-webkit-scrollbar-thumb:hover {
         background: var(--accent-purple);
     }
+    /* Collapsible Section styles */
+    .collapsible-section {
+        margin-bottom: 24px;
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    }
+    
+    .collapsible-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom: 1px solid var(--panel-border);
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.2s ease;
+    }
+    
+    .collapsible-header:hover {
+        background: rgba(255, 255, 255, 0.04);
+    }
+    
+    .collapsible-header h2 {
+        margin: 0;
+        font-family: 'Cinzel', serif;
+        font-size: 1.1rem;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: none;
+        padding: 0;
+    }
+    
+    .collapsible-icon {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        transition: transform 0.3s ease;
+    }
+    
+    .collapsible-content {
+        padding: 24px;
+        transition: max-height 0.35s ease-out, opacity 0.35s ease, padding 0.35s ease;
+        max-height: 2500px;
+        overflow: visible;
+        opacity: 1;
+    }
+    
+    .collapsible-section.collapsed .collapsible-content {
+        max-height: 0;
+        opacity: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        overflow: hidden;
+        border-bottom: none;
+        pointer-events: none;
+    }
+    
+    .collapsible-section.collapsed .collapsible-header {
+        border-bottom-color: transparent;
+    }
+    
+    .collapsible-section.collapsed .collapsible-icon {
+        transform: rotate(-90deg);
+    }
 </style>
 
 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 2px solid rgba(var(--accent-purple-rgb), 0.2); padding-bottom: 12px; gap: 15px;">
@@ -340,263 +409,372 @@
     </div>
 </div>
 
-<div class="charts-grid">
-    <div class="chart-panel">
-        <h3>Estimated Value Over Time</h3>
-        <div class="chart-container">
-            <canvas id="valueHistoryChart"></canvas>
-        </div>
+<!-- Section 1: Financial Value & Trends -->
+<div class="collapsible-section" id="sec_financial">
+    <div class="collapsible-header">
+        <h2><span>📈</span> Financial Value & Trends</h2>
+        <span class="collapsible-icon">▼</span>
     </div>
-    
-    <div class="chart-panel">
-        <h3>Rarity Breakdown</h3>
-        <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
-            <canvas id="rarityChart"></canvas>
-        </div>
-        <div class="rarity-list">
-            {% for r, q in rarity_stats %}
-                <div class="rarity-item">
-                    <span class="badge badge-{{ r|lower }}">{{ r|capitalize }}</span>
-                    <span style="font-weight: 600;">{{ q }} pcs</span>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
-
-<!-- NEW: Secondary Charts Row (Color Balance & Set Breakdown) -->
-<div class="charts-split-grid">
-    <div class="chart-panel">
-        <h3>Color Balance</h3>
-        <div class="chart-container" style="height: 280px;">
-            <canvas id="colorChart"></canvas>
-        </div>
-    </div>
-    <div class="chart-panel">
-        <h3>Set & Franchise Distribution (by Value)</h3>
-        <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
-            <canvas id="setChart"></canvas>
-        </div>
-        <div class="set-list scrollable-panel" style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
-            {% for s in set_stats %}
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="set-color-indicator-{{ loop.index0 }}" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="font-weight: 600; color: var(--text-main);">{{ s.set_name }}</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="color: var(--text-muted); font-size: 0.8rem; margin-right: 8px;">{{ s.count }} pcs</span>
-                        <span style="font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(s.value) }}</span>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
-
-<!-- Set Completion & Missing Cards Section -->
-<div class="chart-panel" style="margin-bottom: 30px; width: 100%;">
-    <h3>Set Completion & Missing Cards Tracker</h3>
-    <div class="scrollable-panel" style="max-height: 350px; margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-        {% for s in set_completion %}
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">{{ s.set_name }}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Set Code: <strong style="color: var(--accent-cyan);">{{ s.set_code }}</strong></div>
-                    </div>
-                    <span class="badge" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.25);">
-                        {{ "%.1f"|format(s.completion_rate) }}%
-                    </span>
-                </div>
-                
-                <!-- Progress Bar -->
-                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin: 4px 0;">
-                    <div style="width: {{ s.completion_rate }}%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); border-radius: 4px;"></div>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
-                    <div>Owned: <strong style="color: var(--text-main);">{{ s.owned_unique }}</strong> / {% if s.total_in_set > 0 %}{{ s.total_in_set }}{% else %}—{% endif %}</div>
-                    <div>Missing: <strong style="color: var(--accent-rose);">{% if s.total_in_set > 0 %}{{ s.missing }}{% else %}—{% endif %}</strong></div>
+    <div class="collapsible-content">
+        <div class="charts-grid">
+            <div class="chart-panel">
+                <h3>Estimated Value Over Time</h3>
+                <div class="chart-container">
+                    <canvas id="valueHistoryChart"></canvas>
                 </div>
             </div>
-        {% endfor %}
-    </div>
-</div>
-
-
-
-<!-- Leaderboards Row -->
-<div class="lists-grid">
-    <div class="chart-panel">
-        <h3>Top 5 Valuable Cards</h3>
-        <div class="items-list">
-            {% if top_valuable %}
-                {% for c in top_valuable %}
-                    <div class="list-item">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            {% if c.image_url %}
-                                <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
-                            {% else %}
-                                <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
-                            {% endif %}
-                            <div>
-                                <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-                                    <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
-                                    {% if c.is_foil %}
-                                        <span class="foil-badge-mini">FOIL</span>
-                                    {% endif %}
-                                    {% if c.is_commander_candidate %}
-                                        <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
-                                    {% endif %}
-                                </div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ c.quantity }}x ${{ "%.2f"|format(c.price) }}</div>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(c.total_value) }}</div>
-                            <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 600;">{{ "%.1f"|format(c.share) }}% share</div>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No valuable cards found.</p>
-            {% endif %}
-        </div>
-    </div>
-    
-    <div class="chart-panel">
-        <h3>Top 5 Highest Quantity (Non-Land)</h3>
-        <div class="items-list">
-            {% if top_qty %}
-                {% for c in top_qty %}
-                    <div class="list-item">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            {% if c.image_url %}
-                                <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
-                            {% else %}
-                                <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
-                            {% endif %}
-                            <div>
-                                <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-                                    <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
-                                    {% if c.is_foil %}
-                                        <span class="foil-badge-mini">FOIL</span>
-                                    {% endif %}
-                                    {% if c.is_commander_candidate %}
-                                        <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
-                                    {% endif %}
-                                </div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted);">${{ "%.2f"|format(c.price) }} each</div>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-weight: 700; color: var(--accent-purple);">{{ c.quantity }} pcs</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted);">Valued: ${{ "%.2f"|format(c.total_value) }}</div>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No non-land cards found.</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<div class="lists-grid">
-    <!-- NEW: Global Card Type Breakdown -->
-    <div class="chart-panel">
-        <h3>Card Type Breakdown</h3>
-        <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
-            {% for t in type_stats %}
-                <div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
-                        <span style="font-weight: 600; color: var(--text-main);">{{ t.type_name }}</span>
-                        <span style="color: var(--text-muted);">{{ t.count }} ({{ "%.1f"|format(t.count / total_cards * 100) }}%)</span>
-                    </div>
-                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
-                        <div style="width: {{ t.count / total_cards * 100 }}%; height: 100%; background: var(--accent-purple); border-radius: 3px;"></div>
-                    </div>
+            
+            <div class="chart-panel">
+                <h3>Rarity Breakdown</h3>
+                <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
+                    <canvas id="rarityChart"></canvas>
                 </div>
-            {% endfor %}
+                <div class="rarity-list">
+                    {% for r, q in rarity_stats %}
+                        <div class="rarity-item">
+                            <span class="badge badge-{{ r|lower }}">{{ r|capitalize }}</span>
+                            <span style="font-weight: 600;">{{ q }} pcs</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Day-to-Day Value Tracking Table -->
+        <div class="chart-panel" style="margin-top: 24px; width: 100%;">
+            <h3 style="font-family: 'Cinzel', serif; margin-bottom: 15px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">📅 Day-to-Day Value Tracking</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--panel-border);">
+                            <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Date</th>
+                            <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Collection Value</th>
+                            <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Daily Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if daily_history %}
+                            {% for day in daily_history %}
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background-color 0.2s;">
+                                    <td style="padding: 12px; font-weight: 600; color: var(--text-main);">{{ day.date }}</td>
+                                    <td style="padding: 12px; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(day.value) }}</td>
+                                    <td style="padding: 12px; font-weight: 700;">
+                                        {% if day.change_val is not none %}
+                                            {% if day.change_val > 0.005 %}
+                                                <span style="color: var(--accent-green);">▲ +${{ "%.2f"|format(day.change_val) }} (+{{ "%.2f"|format(day.change_pct) }}%)</span>
+                                            {% elif day.change_val < -0.005 %}
+                                                <span style="color: var(--accent-rose);">▼ -${{ "%.2f"|format(-day.change_val) }} ({{ "%.2f"|format(day.change_pct) }}%)</span>
+                                            {% else %}
+                                                <span style="color: var(--text-muted);">0.00 (0.00%)</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span style="color: var(--text-muted); font-style: italic;">— (Baseline)</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" style="padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;">No snapshots recorded yet.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- NEW: Recent Additions Feed -->
-    <div class="chart-panel">
-        <h3>Recent Inventory Additions</h3>
-        <div class="items-list">
-            {% if recent_additions %}
-                {% for item in recent_additions %}
-                    <div class="list-item">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            {% if item.image_url %}
-                                <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
-                            {% else %}
-                                <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
-                            {% endif %}
-                            <div>
-                                <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-                                    <a href="{{ item.url }}" style="color: var(--text-main); text-decoration: none;">{{ item.name }}</a>
+<!-- Section 2: Collection Leaderboards -->
+<div class="collapsible-section" id="sec_leaderboards">
+    <div class="collapsible-header">
+        <h2><span>🏆</span> Collection Leaderboards</h2>
+        <span class="collapsible-icon">▼</span>
+    </div>
+    <div class="collapsible-content">
+        <div class="lists-grid">
+            <div class="chart-panel">
+                <h3>Top 5 Valuable Cards</h3>
+                <div class="items-list">
+                    {% if top_valuable %}
+                        {% for c in top_valuable %}
+                            <div class="list-item">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if c.image_url %}
+                                        <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                                    {% else %}
+                                        <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                                    {% endif %}
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                            <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
+                                            {% if c.is_foil %}
+                                                <span class="foil-badge-mini">FOIL</span>
+                                            {% endif %}
+                                            {% if c.is_commander_candidate %}
+                                                <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
+                                            {% endif %}
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ c.quantity }}x ${{ "%.2f"|format(c.price) }}</div>
+                                    </div>
                                 </div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ item.details }}</div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(c.total_value) }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 600;">{{ "%.1f"|format(c.share) }}% share</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No valuable cards found.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="chart-panel">
+                <h3>Top 5 Highest Quantity (Non-Land)</h3>
+                <div class="items-list">
+                    {% if top_qty %}
+                        {% for c in top_qty %}
+                            <div class="list-item">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if c.image_url %}
+                                        <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                                    {% else %}
+                                        <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                                    {% endif %}
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                            <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
+                                            {% if c.is_foil %}
+                                                <span class="foil-badge-mini">FOIL</span>
+                                            {% endif %}
+                                            {% if c.is_commander_candidate %}
+                                                <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
+                                            {% endif %}
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">${{ "%.2f"|format(c.price) }} each</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 700; color: var(--accent-purple);">{{ c.quantity }} pcs</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Valued: ${{ "%.2f"|format(c.total_value) }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No non-land cards found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="lists-grid" style="margin-top: 24px;">
+            <div class="chart-panel">
+                <h3>Top 5 Biggest Gainers (Value Growth)</h3>
+                <div class="items-list">
+                    {% if top_gainers %}
+                        {% for c in top_gainers %}
+                            <div class="list-item">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if c.image_url %}
+                                        <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                                    {% else %}
+                                        <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                                    {% endif %}
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                            <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
+                                            {% if c.is_foil %}
+                                                <span class="foil-badge-mini">FOIL</span>
+                                            {% endif %}
+                                            {% if c.is_commander_candidate %}
+                                                <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
+                                            {% endif %}
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ c.quantity }}x ${{ "%.2f"|format(c.price) }} (Acq: ${{ "%.2f"|format(c.acquired_price) }})</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 700; color: var(--accent-green);">▲ +${{ "%.2f"|format(c.gain) }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">total gain</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No gaining cards in collection.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <h3>Top 5 Biggest Losers (Value Drop)</h3>
+                <div class="items-list">
+                    {% if top_losers %}
+                        {% for c in top_losers %}
+                            <div class="list-item">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if c.image_url %}
+                                        <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                                    {% else %}
+                                        <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                                    {% endif %}
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                            <a href="/card/{{ c.id }}" style="color: var(--text-main); text-decoration: none;">{{ c.name }}</a>
+                                            {% if c.is_foil %}
+                                                <span class="foil-badge-mini">FOIL</span>
+                                            {% endif %}
+                                            {% if c.is_commander_candidate %}
+                                                <span class="cmdr-badge-mini" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 800;" title="Can be your Commander">👑 CMDR</span>
+                                            {% endif %}
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ c.quantity }}x ${{ "%.2f"|format(c.price) }} (Acq: ${{ "%.2f"|format(c.acquired_price) }})</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 700; color: var(--accent-rose);">▼ -${{ "%.2f"|format(-c.loss) }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">total loss</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No losing cards in collection.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Set & Color Analysis -->
+<div class="collapsible-section" id="sec_analysis">
+    <div class="collapsible-header">
+        <h2><span>📊</span> Set & Color Analysis</h2>
+        <span class="collapsible-icon">▼</span>
+    </div>
+    <div class="collapsible-content">
+        <div class="charts-split-grid">
+            <div class="chart-panel">
+                <h3>Color Balance</h3>
+                <div class="chart-container" style="height: 280px;">
+                    <canvas id="colorChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-panel">
+                <h3>Set & Franchise Distribution (by Value)</h3>
+                <div class="chart-container" style="height: 200px; margin-bottom: 20px;">
+                    <canvas id="setChart"></canvas>
+                </div>
+                <div class="set-list scrollable-panel" style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+                    {% for s in set_stats %}
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="set-color-indicator-{{ loop.index0 }}" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+                                <span style="font-weight: 600; color: var(--text-main);">{{ s.set_name }}</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="color: var(--text-muted); font-size: 0.8rem; margin-right: 8px;">{{ s.count }} pcs</span>
+                                <span style="font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(s.value) }}</span>
                             </div>
                         </div>
-                        <div style="text-align: right;">
-                            <span class="badge" style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6, 182, 212, 0.12); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.25);">{{ item.type }}</span>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">{{ item.set_code }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Set Completion & Missing Cards Section -->
+        <div class="chart-panel" style="margin-top: 24px; width: 100%;">
+            <h3>Set Completion & Missing Cards Tracker</h3>
+            <div class="scrollable-panel" style="max-height: 350px; margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                {% for s in set_completion %}
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">{{ s.set_name }}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Set Code: <strong style="color: var(--accent-cyan);">{{ s.set_code }}</strong></div>
+                            </div>
+                            <span class="badge" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.25);">
+                                {{ "%.1f"|format(s.completion_rate) }}%
+                            </span>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin: 4px 0;">
+                            <div style="width: {{ s.completion_rate }}%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); border-radius: 4px;"></div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                            <div>Owned: <strong style="color: var(--text-main);">{{ s.owned_unique }}</strong> / {% if s.total_in_set > 0 %}{{ s.total_in_set }}{% else %}—{% endif %}</div>
+                            <div>Missing: <strong style="color: var(--accent-rose);">{% if s.total_in_set > 0 %}{{ s.missing }}{% else %}—{% endif %}</strong></div>
                         </div>
                     </div>
                 {% endfor %}
-            {% else %}
-                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No recent additions.</p>
-            {% endif %}
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Day-to-Day Value Tracking Table -->
-<div class="chart-panel" style="margin-top: 24px; margin-bottom: 24px; width: 100%;">
-    <h3 style="font-family: 'Cinzel', serif; margin-bottom: 15px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">📅 Day-to-Day Value Tracking</h3>
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-                <tr style="border-bottom: 1px solid var(--panel-border);">
-                    <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Date</th>
-                    <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Collection Value</th>
-                    <th style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Daily Change</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if daily_history %}
-                    {% for day in daily_history %}
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background-color 0.2s;">
-                            <td style="padding: 12px; font-weight: 600; color: var(--text-main);">{{ day.date }}</td>
-                            <td style="padding: 12px; font-weight: 700; color: var(--accent-gold);">${{ "%.2f"|format(day.value) }}</td>
-                            <td style="padding: 12px; font-weight: 700;">
-                                {% if day.change_val is not none %}
-                                    {% if day.change_val > 0.005 %}
-                                        <span style="color: var(--accent-green);">▲ +${{ "%.2f"|format(day.change_val) }} (+{{ "%.2f"|format(day.change_pct) }}%)</span>
-                                    {% elif day.change_val < -0.005 %}
-                                        <span style="color: var(--accent-rose);">▼ -${{ "%.2f"|format(-day.change_val) }} ({{ "%.2f"|format(day.change_pct) }}%)</span>
-                                    {% else %}
-                                        <span style="color: var(--text-muted);">0.00 (0.00%)</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span style="color: var(--text-muted); font-style: italic;">— (Baseline)</span>
-                                {% endif %}
-                            </td>
-                        </tr>
+<!-- Section 4: Inventory Logs & Breakdown -->
+<div class="collapsible-section" id="sec_logs">
+    <div class="collapsible-header">
+        <h2><span>📦</span> Inventory Logs & Breakdown</h2>
+        <span class="collapsible-icon">▼</span>
+    </div>
+    <div class="collapsible-content">
+        <div class="lists-grid" style="margin-bottom: 0;">
+            <!-- Global Card Type Breakdown -->
+            <div class="chart-panel">
+                <h3>Card Type Breakdown</h3>
+                <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
+                    {% for t in type_stats %}
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                                <span style="font-weight: 600; color: var(--text-main);">{{ t.type_name }}</span>
+                                <span style="color: var(--text-muted);">{{ t.count }} ({{ "%.1f"|format(t.count / total_cards * 100) }}%)</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                                <div style="width: {{ t.count / total_cards * 100 }}%; height: 100%; background: var(--accent-purple); border-radius: 3px;"></div>
+                            </div>
+                        </div>
                     {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="3" style="padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;">Nosnapshots recorded yet.</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                </div>
+            </div>
+
+            <!-- Recent Additions Feed -->
+            <div class="chart-panel">
+                <h3>Recent Inventory Additions</h3>
+                <div class="items-list">
+                    {% if recent_additions %}
+                        {% for item in recent_additions %}
+                            <div class="list-item">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if item.image_url %}
+                                        <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
+                                    {% else %}
+                                        <div style="width: 32px; height: 44px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.5rem;">🃏</div>
+                                    {% endif %}
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                            <a href="{{ item.url }}" style="color: var(--text-main); text-decoration: none;">{{ item.name }}</a>
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ item.details }}</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="badge" style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(6, 182, 212, 0.12); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.25);">{{ item.type }}</span>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">{{ item.set_code }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin: 20px 0;">No recent additions.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -873,6 +1051,24 @@
         if (link.getAttribute('href') === currentPath) {
             link.classList.add('active');
         }
+    });
+    // Collapsible sections — collapsed by default, localStorage overrides
+    document.querySelectorAll('.collapsible-header').forEach(header => {
+        const section = header.closest('.collapsible-section');
+        const sectionId = section.id;
+
+        // Default: collapsed. Only open if user previously opened it.
+        const stored = localStorage.getItem('dash_collapsed_' + sectionId);
+        if (stored === 'false') {
+            // User explicitly opened this section before — keep it open
+        } else {
+            section.classList.add('collapsed');
+        }
+
+        header.addEventListener('click', () => {
+            section.classList.toggle('collapsed');
+            localStorage.setItem('dash_collapsed_' + sectionId, section.classList.contains('collapsed'));
+        });
     });
 </script>
 {% endblock %}

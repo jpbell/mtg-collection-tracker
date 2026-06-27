@@ -638,6 +638,54 @@ def dashboard():
             'is_commander_candidate': c.is_commander_candidate
         })
 
+    # Top 5 biggest losers (absolute value loss since acquisition)
+    losers_list = []
+    for c in all_cards:
+        acq_price = c.acquired_price if c.acquired_price is not None else c.price
+        diff = (c.price - acq_price) * c.quantity
+        if diff < -0.005:
+            losers_list.append((c, diff))
+    losers_list = sorted(losers_list, key=lambda x: x[1])[:5]
+    
+    top_losers = []
+    for c, diff in losers_list:
+        top_losers.append({
+            'id': c.id,
+            'name': c.name,
+            'set_code': c.set_code,
+            'image_url': c.image_url,
+            'quantity': c.quantity,
+            'price': c.price,
+            'acquired_price': c.acquired_price if c.acquired_price is not None else c.price,
+            'loss': diff,
+            'is_foil': c.is_foil,
+            'is_commander_candidate': c.is_commander_candidate
+        })
+
+    # Top 5 biggest gainers (absolute value gain since acquisition)
+    gainers_list = []
+    for c in all_cards:
+        acq_price = c.acquired_price if c.acquired_price is not None else c.price
+        diff = (c.price - acq_price) * c.quantity
+        if diff > 0.005:
+            gainers_list.append((c, diff))
+    gainers_list = sorted(gainers_list, key=lambda x: x[1], reverse=True)[:5]
+    
+    top_gainers = []
+    for c, diff in gainers_list:
+        top_gainers.append({
+            'id': c.id,
+            'name': c.name,
+            'set_code': c.set_code,
+            'image_url': c.image_url,
+            'quantity': c.quantity,
+            'price': c.price,
+            'acquired_price': c.acquired_price if c.acquired_price is not None else c.price,
+            'gain': diff,
+            'is_foil': c.is_foil,
+            'is_commander_candidate': c.is_commander_candidate
+        })
+
     # --- NEW: Color stats calculation ---
     color_counts = {'W': 0, 'U': 0, 'B': 0, 'R': 0, 'G': 0, 'Multicolor': 0, 'Colorless': 0}
     for card in all_cards:
@@ -857,6 +905,8 @@ def dashboard():
         change_1y=change_1y,
         top_valuable=top_valuable,
         top_qty=top_qty,
+        top_losers=top_losers,
+        top_gainers=top_gainers,
         color_stats=color_stats,
         set_stats=set_stats,
         foil_stats=foil_stats,
