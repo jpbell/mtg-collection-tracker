@@ -1904,7 +1904,7 @@ def view_deck(deck_id):
         })
             
     # Calculate deck analytics
-    cmc_distribution = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, '7+': 0}
+    cmc_distribution = {'0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7+': 0}
     color_pips = {'W': 0, 'U': 0, 'B': 0, 'R': 0, 'G': 0}
     type_counts = {
         'Creature': 0,
@@ -1958,10 +1958,12 @@ def view_deck(deck_id):
             c_val = card.cmc or 0
             if c_val >= 7:
                 cmc_distribution['7+'] += qty
-            elif c_val in cmc_distribution:
-                cmc_distribution[c_val] += qty
             else:
-                cmc_distribution[0] += qty
+                c_key = str(c_val)
+                if c_key in cmc_distribution:
+                    cmc_distribution[c_key] += qty
+                else:
+                    cmc_distribution['0'] += qty
                 
         # 3. Pip symbol counts
         m_cost = card.mana_cost or ''
@@ -3557,13 +3559,13 @@ def view_showcase(username=None):
     user_decks = Deck.query.filter_by(user_id=user.id).all()
     decks_list = []
     for deck in user_decks:
-        total_qty = sum(dc.quantity for dc in deck.cards if dc.card)
+        deck_total_qty = sum(dc.quantity for dc in deck.cards if dc.card)
         basic_land_names = ['mountain', 'forest', 'plains', 'island', 'swamp', 'waste']
         type_counts = {
             'Creature': 0, 'Instant': 0, 'Sorcery': 0, 'Land': 0,
             'Artifact': 0, 'Enchantment': 0, 'Planeswalker': 0, 'Other': 0
         }
-        cmc_dist = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, '7+': 0}
+        cmc_dist = {'0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7+': 0}
         color_pips = {'W': 0, 'U': 0, 'B': 0, 'R': 0, 'G': 0}
         
         deck_cards = []
@@ -3606,10 +3608,12 @@ def view_showcase(username=None):
                 c_val = card.cmc or 0
                 if c_val >= 7:
                     cmc_dist['7+'] += qty
-                elif c_val in cmc_dist:
-                    cmc_dist[c_val] += qty
                 else:
-                    cmc_dist[0] += qty
+                    c_key = str(c_val)
+                    if c_key in cmc_dist:
+                        cmc_dist[c_key] += qty
+                    else:
+                        cmc_dist['0'] += qty
                     
             m_cost = card.mana_cost or ''
             for symbol, key in [('{W}', 'W'), ('{U}', 'U'), ('{B}', 'B'), ('{R}', 'R'), ('{G}', 'G')]:
@@ -3625,7 +3629,7 @@ def view_showcase(username=None):
             'wins': deck.wins,
             'losses': deck.losses,
             'draws': deck.draws,
-            'total_cards': total_qty,
+            'total_cards': deck_total_qty,
             'cards': deck_cards,
             'type_counts': type_counts,
             'cmc_distribution': cmc_dist,
