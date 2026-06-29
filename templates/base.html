@@ -1046,6 +1046,276 @@
         let mediaStream = null;
         let currentZoom = 1.0;
         let hardwareZoomActive = false;
+        let cropLeftPercent = 10;
+        let cropOffsetPercent = 15;
+        
+        let isScanningActive = false;
+        let isProcessingOCR = false;
+        let lastScannedName = "";
+        let consecNoCardFrames = 0;
+
+        function playBeep(freq = 600, duration = 0.12) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.warn("Could not play scan beep:", e);
+            }
+        }
+
+        function isSameCardText(textA, textB) {
+            if (!textA || !textB) return false;
+            const a = textA.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const b = textB.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (a === b) return true;
+            
+            if (a.length > 4 && b.length > 4) {
+                if (a.startsWith(b) || b.startsWith(a)) return true;
+            }
+            return false;
+        }
+
+        function startAutoScanLoop() {
+            isScanningActive = true;
+            lastScannedName = "";
+            consecNoCardFrames = 0;
+            autoScanNextFrame();
+        }
+
+        function stopAutoScanLoop() {
+            isScanningActive = false;
+        }
+
+        function autoScanNextFrame() {
+            if (!isScanningActive) return;
+            if (isProcessingOCR) {
+                setTimeout(autoScanNextFrame, 200);
+                return;
+            }
+            processFrameForOCR();
+        }
+
+        function processFrameForOCR() {
+            const video = document.getElementById('scannerVideo');
+            const canvas = document.getElementById('scannerCanvas');
+            if (!video || !canvas || video.paused || video.ended) {
+                isProcessingOCR = false;
+                setTimeout(autoScanNextFrame, 800);
+                return;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            const videoWidth = video.videoWidth || 640;
+            const videoHeight = video.videoHeight || 480;
+            
+            const left_s = cropLeftPercent / 100;
+            const top_s = cropOffsetPercent / 100;
+            const width_s = 0.8 * 0.9;
+            const height_s = 0.12;
+
+            let sx, sy, sw, sh;
+            if (hardwareZoomActive) {
+                sx = videoWidth * left_s;
+                sy = videoHeight * top_s;
+                sw = videoWidth * width_s;
+                sh = videoHeight * height_s;
+            } else {
+                const Z = currentZoom;
+                sx = videoWidth * (0.5 + (left_s - 0.5) / Z);
+                sy = videoHeight * (0.5 + (top_s - 0.5) / Z);
+                sw = videoWidth * (width_s / Z);
+                sh = videoHeight * (height_s / Z);
+            }
+            
+            canvas.width = sw * 2;
+            canvas.height = sh * 2;
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw * 2, sh * 2);
+            
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            
+            let totalBrightness = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                totalBrightness += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            }
+            const avgBrightness = totalBrightness / (data.length / 4);
+            const shouldInvert = avgBrightness < 120;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                let brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                if (shouldInvert) {
+                    brightness = 255 - brightness;
+                }
+                let val = 1.35 * (brightness - 128) + 128;
+                val = Math.max(0, Math.min(255, val));
+                
+                data[i] = val;
+                data[i+1] = val;
+                data[i+2] = val;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            
+            const previewImg = document.getElementById('scannerCropPreview');
+            if (previewImg) {
+                previewImg.src = canvas.toDataURL('image/png');
+            }
+            
+            const fullCanvas = document.getElementById('scannerFullCanvas');
+            if (fullCanvas) {
+                const fullCtx = fullCanvas.getContext('2d');
+                let fsx, fsy, fsw, fsh;
+                if (hardwareZoomActive) {
+                    fsx = 0;
+                    fsy = 0;
+                    fsw = videoWidth;
+                    fsh = videoHeight;
+                } else {
+                    const Z = currentZoom;
+                    fsx = videoWidth * (0.5 - 0.5 / Z);
+                    fsy = videoHeight * (0.5 - 0.5 / Z);
+                    fsw = videoWidth / Z;
+                    fsh = videoHeight / Z;
+                }
+                fullCanvas.width = fsw;
+                fullCanvas.height = fsh;
+                fullCtx.drawImage(video, fsx, fsy, fsw, fsh, 0, 0, fsw, fsh);
+                
+                const fullPreviewImg = document.getElementById('scannerFullPreview');
+                if (fullPreviewImg) {
+                    fullPreviewImg.src = fullCanvas.toDataURL('image/png');
+                }
+                
+                const cropHighlight = document.getElementById('scannerCropHighlight');
+                if (cropHighlight) {
+                    cropHighlight.style.top = cropOffsetPercent + '%';
+                    cropHighlight.style.left = cropLeftPercent + '%';
+                    cropHighlight.style.width = (0.8 * 0.9 * 100) + '%';
+                    cropHighlight.style.height = '12%';
+                }
+            }
+            
+            const previewContainer = document.getElementById('cropPreviewContainer');
+            if (previewContainer) {
+                previewContainer.style.display = 'flex';
+            }
+            
+            runOCR(canvas.toDataURL('image/png'), true);
+        }
+
+        function handleAutoOCRResult(text) {
+            const autoStatus = document.getElementById('autoScanStatusText');
+            
+            if (!text || text.length < 3) {
+                consecNoCardFrames++;
+                if (consecNoCardFrames >= 2) {
+                    if (lastScannedName !== "") {
+                        lastScannedName = "";
+                        if (autoStatus) {
+                            autoStatus.textContent = " Ready for next card...";
+                            autoStatus.style.color = "var(--text-muted)";
+                        }
+                    }
+                }
+                return;
+            }
+            
+            consecNoCardFrames = 0;
+            
+            if (lastScannedName && isSameCardText(text, lastScannedName)) {
+                if (autoStatus) {
+                    autoStatus.textContent = `🟢 Card in slot: "${lastScannedName}"`;
+                    autoStatus.style.color = "var(--accent-green)";
+                }
+                return;
+            }
+            
+            if (autoStatus) {
+                autoStatus.textContent = `⚡ Querying: "${text}"...`;
+                autoStatus.style.color = "var(--accent-purple)";
+            }
+            
+            autoSummonCardByName(text);
+        }
+
+        function autoSummonCardByName(name) {
+            const autoStatus = document.getElementById('autoScanStatusText');
+            
+            fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("No match.");
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data.data || data.data.length === 0) {
+                        throw new Error("No cards.");
+                    }
+                    
+                    const card = data.data[0];
+                    
+                    const formData = new FormData();
+                    formData.append('set_code', card.set.toUpperCase());
+                    formData.append('collector_number', card.collector_number);
+                    formData.append('condition', 'Near Mint');
+                    
+                    fetch('/add', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(addRes => {
+                        if (addRes.ok) {
+                            lastScannedName = card.name;
+                            window.scannerMadeAdditions = true;
+                            window.sessionSummonCount = (window.sessionSummonCount || 0) + 1;
+                            
+                            const badge = document.getElementById('sessionCounterBadge');
+                            if (badge) {
+                                badge.textContent = `${window.sessionSummonCount} Summoned`;
+                                badge.style.display = 'inline-block';
+                            }
+                            
+                            if (autoStatus) {
+                                autoStatus.textContent = `🎉 Added: ${card.name}!`;
+                                autoStatus.style.color = "var(--accent-green)";
+                            }
+                            
+                            playBeep(650, 0.12);
+                            
+                            const guideBox = document.getElementById('scannerGuideBox');
+                            if (guideBox) {
+                                guideBox.classList.add('scan-success-flash');
+                                setTimeout(() => {
+                                    guideBox.classList.remove('scan-success-flash');
+                                }, 1000);
+                            }
+                            
+                            searchScryfallForScanner(card.name);
+                        } else {
+                            if (autoStatus) {
+                                autoStatus.textContent = `❌ Failed to add "${card.name}"`;
+                                autoStatus.style.color = "var(--accent-red)";
+                            }
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.warn("Auto-summon failed:", err);
+                    if (autoStatus) {
+                        autoStatus.textContent = `⚠️ No match for: "${name}"`;
+                        autoStatus.style.color = "var(--accent-orange)";
+                    }
+                });
+        }
 
         function applyZoom(zoomVal) {
             currentZoom = parseFloat(zoomVal);
@@ -1114,12 +1384,14 @@
                 return;
             }
             
+            const targetDeviceId = deviceId || localStorage.getItem('scanner_deviceId');
+            
             const constraints = {
                 video: {
                     width: { ideal: 1920 },
                     height: { ideal: 1080 },
-                    deviceId: deviceId ? { exact: deviceId } : undefined,
-                    facingMode: deviceId ? undefined : { ideal: 'environment' }
+                    deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined,
+                    facingMode: targetDeviceId ? undefined : { ideal: 'environment' }
                 }
             };
             
@@ -1153,6 +1425,9 @@
             if (video) {
                 video.srcObject = null;
             }
+            if (typeof stopAutoScanLoop === 'function') {
+                stopAutoScanLoop();
+            }
         }
 
         function updateCameraList() {
@@ -1185,19 +1460,28 @@
                 });
         }
 
-        function runOCR(imageSrc) {
+        function runOCR(imageSrc, isAutoMode = false) {
             const ocrStatusContainer = document.getElementById('ocrStatusContainer');
             const ocrLoader = document.getElementById('ocrLoader');
             const ocrResultText = document.getElementById('ocrResultText');
             const scannerResultsContainer = document.getElementById('scannerResultsContainer');
-            const scannerResultsList = document.getElementById('scannerResultsList');
             
             if (!ocrStatusContainer) return;
             
-            ocrStatusContainer.style.display = 'block';
-            ocrLoader.style.display = 'flex';
-            ocrResultText.style.display = 'none';
-            scannerResultsContainer.style.display = 'none';
+            if (!isAutoMode) {
+                ocrStatusContainer.style.display = 'block';
+                ocrLoader.style.display = 'flex';
+                ocrResultText.style.display = 'none';
+                scannerResultsContainer.style.display = 'none';
+            } else {
+                const autoStatus = document.getElementById('autoScanStatusText');
+                if (autoStatus) {
+                    autoStatus.textContent = "🔍 Reading card title...";
+                    autoStatus.style.color = "var(--accent-cyan)";
+                }
+            }
+            
+            isProcessingOCR = true;
             
             Tesseract.recognize(
                 imageSrc,
@@ -1206,36 +1490,46 @@
                     tessedit_pageseg_mode: '7',
                     tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ -,\'/',
                     logger: m => {
-                        if (m.status === 'recognizing text') {
+                        if (!isAutoMode && m.status === 'recognizing text') {
                             const pct = Math.round(m.progress * 100);
                             ocrLoader.querySelector('span:last-child').textContent = `Reading text (${pct}%)...`;
                         }
                     }
                 }
             ).then(({ data: { text } }) => {
-                ocrLoader.style.display = 'none';
+                isProcessingOCR = false;
                 const cleanedText = text.replace(/[^a-zA-Z0-9\s'/,-]/g, '').replace(/\n/g, ' ').trim();
                 
-                // Pre-populate manual search box with detected text for easy user corrections
-                const searchInput = document.getElementById('scannerSearchInput');
-                if (searchInput) {
-                    searchInput.value = cleanedText;
-                }
-                
-                if (!cleanedText) {
-                    ocrResultText.textContent = "Could not read card title. Position title inside dashes and try again.";
+                if (isAutoMode) {
+                    handleAutoOCRResult(cleanedText);
+                    setTimeout(autoScanNextFrame, 600);
+                } else {
+                    ocrLoader.style.display = 'none';
+                    const searchInput = document.getElementById('scannerSearchInput');
+                    if (searchInput) {
+                        searchInput.value = cleanedText;
+                    }
+                    
+                    if (!cleanedText) {
+                        ocrResultText.textContent = "Could not read card title. Position title inside dashes and try again.";
+                        ocrResultText.style.display = 'block';
+                        return;
+                    }
+                    
+                    ocrResultText.textContent = `Detected Title: "${cleanedText}"`;
                     ocrResultText.style.display = 'block';
-                    return;
+                    searchScryfallForScanner(cleanedText);
                 }
-                
-                ocrResultText.textContent = `Detected Title: "${cleanedText}"`;
-                ocrResultText.style.display = 'block';
-                searchScryfallForScanner(cleanedText);
             }).catch(err => {
                 console.error("OCR failed:", err);
-                ocrLoader.style.display = 'none';
-                ocrResultText.textContent = "OCR engine error. Try uploading a high-contrast file.";
-                ocrResultText.style.display = 'block';
+                isProcessingOCR = false;
+                if (isAutoMode) {
+                    setTimeout(autoScanNextFrame, 800);
+                } else {
+                    ocrLoader.style.display = 'none';
+                    ocrResultText.textContent = "OCR engine error. Try uploading a high-contrast file.";
+                    ocrResultText.style.display = 'block';
+                }
             });
         }
 
@@ -1447,9 +1741,43 @@
             const fileInput = document.getElementById('scannerFileInput');
             const guideBox = document.getElementById('scannerGuideBox');
             
-            let cropOffsetPercent = 15;
-            let cropLeftPercent = 10;
+            // Load settings from localStorage
+            let savedZoom = parseFloat(localStorage.getItem('scanner_zoom')) || 1.0;
+            let savedCropLeft = parseInt(localStorage.getItem('scanner_cropLeft')) || 10;
+            let savedCropOffset = parseInt(localStorage.getItem('scanner_cropOffset')) || 15;
+            let savedAutoScan = localStorage.getItem('scanner_autoScan') === 'true';
+            
+            currentZoom = savedZoom;
+            cropLeftPercent = savedCropLeft;
+            cropOffsetPercent = savedCropOffset;
+            let autoScanEnabled = savedAutoScan;
             let torchEnabled = false;
+            
+            // Apply loaded settings to elements
+            const zoomSlider = document.getElementById('cameraZoomSlider');
+            if (zoomSlider) {
+                zoomSlider.value = savedZoom;
+            }
+            
+            const leftSlider = document.getElementById('cropLeftSlider');
+            const leftSliderVal = document.getElementById('cropLeftVal');
+            if (leftSlider && leftSliderVal) {
+                leftSlider.value = savedCropLeft;
+                leftSliderVal.textContent = savedCropLeft + '%';
+            }
+            if (guideBox) {
+                guideBox.style.left = savedCropLeft + '%';
+            }
+            
+            const slider = document.getElementById('cropOffsetSlider');
+            const sliderVal = document.getElementById('cropOffsetVal');
+            if (slider && sliderVal) {
+                slider.value = savedCropOffset;
+                sliderVal.textContent = savedCropOffset + '%';
+            }
+            if (guideBox) {
+                guideBox.style.top = savedCropOffset + '%';
+            }
             
             if (openScanner && scannerModal) {
                 openScanner.addEventListener('click', () => {
@@ -1468,26 +1796,14 @@
                         torchBtn.style.background = '';
                     }
                     
-                    // Reset zoom to 1.0 when opening the scanner modal
-                    const zoomSlider = document.getElementById('cameraZoomSlider');
-                    const zoomValText = document.getElementById('cameraZoomVal');
-                    if (zoomSlider && zoomValText) {
-                        zoomSlider.value = 1.0;
-                        zoomValText.textContent = '1.0x';
+                    // Re-apply loaded settings to camera state on open
+                    applyZoom(currentZoom);
+                    if (guideBox) {
+                        guideBox.style.left = cropLeftPercent + '%';
+                        guideBox.style.top = cropOffsetPercent + '%';
                     }
-                    currentZoom = 1.0;
-                    hardwareZoomActive = false;
-                    if (video) video.style.transform = '';
                     
-                    // Reset crop left to 10% when opening the scanner modal
-                    const leftSlider = document.getElementById('cropLeftSlider');
-                    const leftSliderVal = document.getElementById('cropLeftVal');
-                    if (leftSlider && leftSliderVal) {
-                        leftSlider.value = 10;
-                        leftSliderVal.textContent = '10%';
-                    }
-                    cropLeftPercent = 10;
-                    if (guideBox) guideBox.style.left = '10%';
+                    updateAutoScanUI();
                     
                     scannerModal.style.display = 'flex';
                     startCamera();
@@ -1505,32 +1821,69 @@
             }
 
             // Crop Offset Slider listener
-            const slider = document.getElementById('cropOffsetSlider');
-            const sliderVal = document.getElementById('cropOffsetVal');
             if (slider && sliderVal && guideBox) {
                 slider.addEventListener('input', (e) => {
                     cropOffsetPercent = parseInt(e.target.value);
+                    localStorage.setItem('scanner_cropOffset', cropOffsetPercent);
                     sliderVal.textContent = cropOffsetPercent + '%';
                     guideBox.style.top = cropOffsetPercent + '%';
                 });
             }
             
             // Crop Left Slider listener
-            const leftSlider = document.getElementById('cropLeftSlider');
-            const leftSliderVal = document.getElementById('cropLeftVal');
             if (leftSlider && leftSliderVal && guideBox) {
                 leftSlider.addEventListener('input', (e) => {
                     cropLeftPercent = parseInt(e.target.value);
+                    localStorage.setItem('scanner_cropLeft', cropLeftPercent);
                     leftSliderVal.textContent = cropLeftPercent + '%';
                     guideBox.style.left = cropLeftPercent + '%';
                 });
             }
             
             // Zoom Slider listener
-            const zoomSlider = document.getElementById('cameraZoomSlider');
             if (zoomSlider) {
                 zoomSlider.addEventListener('input', (e) => {
-                    applyZoom(e.target.value);
+                    const zoomVal = e.target.value;
+                    localStorage.setItem('scanner_zoom', zoomVal);
+                    applyZoom(zoomVal);
+                });
+            }
+            
+            // Auto-Scan Button and state UI setup
+            const autoScanBtn = document.getElementById('autoScanBtn');
+            const autoScanBtnText = document.getElementById('autoScanBtnText');
+            const autoScanEmoji = document.getElementById('autoScanEmoji');
+            const autoScanStatusContainer = document.getElementById('autoScanStatusContainer');
+            
+            function updateAutoScanUI() {
+                if (autoScanEnabled) {
+                    if (autoScanBtn) {
+                        autoScanBtn.style.background = 'var(--accent-purple)';
+                        autoScanBtn.style.color = '#fff';
+                    }
+                    if (autoScanBtnText) autoScanBtnText.textContent = 'Auto-Scan On';
+                    if (autoScanEmoji) autoScanEmoji.textContent = '🤖';
+                    if (autoScanStatusContainer) autoScanStatusContainer.style.display = 'flex';
+                    if (captureBtn) captureBtn.style.display = 'none';
+                    startAutoScanLoop();
+                } else {
+                    if (autoScanBtn) {
+                        autoScanBtn.style.background = '';
+                        autoScanBtn.style.color = '';
+                    }
+                    if (autoScanBtnText) autoScanBtnText.textContent = 'Auto-Scan Off';
+                    if (autoScanEmoji) autoScanEmoji.textContent = '🤖';
+                    if (autoScanStatusContainer) autoScanStatusContainer.style.display = 'none';
+                    if (captureBtn) captureBtn.style.display = 'block';
+                    stopAutoScanLoop();
+                }
+            }
+            
+            if (autoScanBtn) {
+                autoScanBtn.addEventListener('click', () => {
+                    autoScanEnabled = !autoScanEnabled;
+                    localStorage.setItem('scanner_autoScan', autoScanEnabled);
+                    updateAutoScanUI();
                 });
             }
             
@@ -1780,6 +2133,14 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        @keyframes scanSuccessFlash {
+            0% { border-color: var(--accent-purple); box-shadow: 0 0 15px var(--accent-purple); }
+            50% { border-color: var(--accent-green); box-shadow: 0 0 25px var(--accent-green); }
+            100% { border-color: var(--accent-purple); box-shadow: 0 0 15px var(--accent-purple); }
+        }
+        .scan-success-flash {
+            animation: scanSuccessFlash 0.8s ease-out;
+        }
         .modal-overlay {
             position: fixed;
             z-index: 10000;
@@ -1826,6 +2187,11 @@
                         <span>🔦</span> <span id="torchBtnText">Torch On</span>
                     </button>
                 </div>
+                <div style="display: flex; gap: 6px; align-items: center;" id="autoScanContainer">
+                    <button type="button" id="autoScanBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; height: 28px; transition: all 0.2s ease;">
+                        <span id="autoScanEmoji">🤖</span> <span id="autoScanBtnText">Auto-Scan Off</span>
+                    </button>
+                </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 160px;">
                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Zoom:</span>
                     <input type="range" id="cameraZoomSlider" min="1" max="4" step="0.1" value="1" style="flex: 1; accent-color: var(--accent-purple); height: 4px; cursor: pointer;">
@@ -1847,6 +2213,10 @@
                 <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill;"></video>
                 <div id="scannerGuideBox" style="position: absolute; top: 15%; left: 10%; width: 80%; height: 12%; border: 3px dashed var(--accent-purple); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <span style="font-size: 0.62rem; color: #fff; background: rgba(168, 85, 247, 0.9); padding: 2px 6px; border-radius: 4px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Align Card Title Here</span>
+                </div>
+                <!-- Auto-Scan Status Bar Overlay -->
+                <div id="autoScanStatusContainer" style="display: none; position: absolute; bottom: 0; left: 0; right: 0; background: rgba(12, 10, 28, 0.85); backdrop-filter: blur(4px); padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.1); align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 0.82rem; color: var(--text-main); text-align: center; pointer-events: none; z-index: 10;">
+                    <span id="autoScanStatusText"> Ready for next card...</span>
                 </div>
             </div>
 
