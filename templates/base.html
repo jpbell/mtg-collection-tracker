@@ -1382,8 +1382,10 @@
             const canvas = document.getElementById('scannerCanvas');
             const camSelect = document.getElementById('cameraSelect');
             const fileInput = document.getElementById('scannerFileInput');
+            const guideBox = document.getElementById('scannerGuideBox');
             
             let cropOffsetPercent = 15;
+            let cropLeftPercent = 10;
             let torchEnabled = false;
             
             if (openScanner && scannerModal) {
@@ -1414,6 +1416,16 @@
                     hardwareZoomActive = false;
                     if (video) video.style.transform = '';
                     
+                    // Reset crop left to 10% when opening the scanner modal
+                    const leftSlider = document.getElementById('cropLeftSlider');
+                    const leftSliderVal = document.getElementById('cropLeftVal');
+                    if (leftSlider && leftSliderVal) {
+                        leftSlider.value = 10;
+                        leftSliderVal.textContent = '10%';
+                    }
+                    cropLeftPercent = 10;
+                    if (guideBox) guideBox.style.left = '10%';
+                    
                     scannerModal.style.display = 'flex';
                     startCamera();
                 });
@@ -1432,12 +1444,22 @@
             // Crop Offset Slider listener
             const slider = document.getElementById('cropOffsetSlider');
             const sliderVal = document.getElementById('cropOffsetVal');
-            const guideBox = document.getElementById('scannerGuideBox');
             if (slider && sliderVal && guideBox) {
                 slider.addEventListener('input', (e) => {
                     cropOffsetPercent = parseInt(e.target.value);
                     sliderVal.textContent = cropOffsetPercent + '%';
                     guideBox.style.top = cropOffsetPercent + '%';
+                });
+            }
+            
+            // Crop Left Slider listener
+            const leftSlider = document.getElementById('cropLeftSlider');
+            const leftSliderVal = document.getElementById('cropLeftVal');
+            if (leftSlider && leftSliderVal && guideBox) {
+                leftSlider.addEventListener('input', (e) => {
+                    cropLeftPercent = parseInt(e.target.value);
+                    leftSliderVal.textContent = cropLeftPercent + '%';
+                    guideBox.style.left = cropLeftPercent + '%';
                 });
             }
             
@@ -1515,9 +1537,9 @@
                     const videoWidth = video.videoWidth || 640;
                     const videoHeight = video.videoHeight || 480;
                     
-                    // Guide box is: top: 15%, left: 10%, width: 80%, height: 12%
+                    // Guide box is: top: cropOffsetPercent%, left: cropLeftPercent%, width: 80%, height: 12%
                     // We crop 90% of the box's width to ensure long card names are not truncated
-                    const left_s = 0.1;
+                    const left_s = cropLeftPercent / 100;
                     const top_s = cropOffsetPercent / 100;
                     const width_s = 0.8 * 0.9;
                     const height_s = 0.12;
@@ -1696,6 +1718,11 @@
                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Zoom:</span>
                     <input type="range" id="cameraZoomSlider" min="1" max="4" step="0.1" value="1" style="flex: 1; accent-color: var(--accent-purple); height: 4px; cursor: pointer;">
                     <span id="cameraZoomVal" style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; width: 25px; text-align: right;">1.0x</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 160px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Crop Left:</span>
+                    <input type="range" id="cropLeftSlider" min="0" max="20" value="10" style="flex: 1; accent-color: var(--accent-purple); height: 4px; cursor: pointer;">
+                    <span id="cropLeftVal" style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; width: 25px; text-align: right;">10%</span>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 160px;">
                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Crop Height:</span>
