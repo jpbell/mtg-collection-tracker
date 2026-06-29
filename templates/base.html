@@ -1162,13 +1162,24 @@
             navigator.mediaDevices.enumerateDevices()
                 .then(devices => {
                     const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                    if (select.options.length === videoDevices.length) return;
+                    
+                    // Get currently active camera device ID if available
+                    let activeDeviceId = null;
+                    if (mediaStream) {
+                        const tracks = mediaStream.getVideoTracks();
+                        if (tracks.length > 0) {
+                            activeDeviceId = tracks[0].getSettings().deviceId;
+                        }
+                    }
                     
                     select.innerHTML = '';
                     videoDevices.forEach((device, index) => {
                         const option = document.createElement('option');
                         option.value = device.deviceId;
                         option.text = device.label || `Camera ${index + 1}`;
+                        if (activeDeviceId && device.deviceId === activeDeviceId) {
+                            option.selected = true;
+                        }
                         select.appendChild(option);
                     });
                 });
