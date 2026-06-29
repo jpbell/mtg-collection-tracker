@@ -1742,7 +1742,7 @@
                     
                     ocrResultText.textContent = `Detected Title: "${cleanedText}"`;
                     ocrResultText.style.display = 'block';
-                    searchScryfallForScanner(cleanedText);
+                    processScannedCardName(cleanedText);
                 }
             }).catch(err => {
                 console.error("OCR failed:", err);
@@ -1752,7 +1752,10 @@
                 } else {
                     ocrLoader.style.display = 'none';
                     ocrResultText.textContent = "OCR engine error. Try uploading a high-contrast file.";
-                    ocrResultText.style.display         // Initialize ManaBox UI Listeners
+                    ocrResultText.style.display = 'block';
+                }
+            });
+        }
         function setupManaBoxUIListeners() {
             const altsSelect = document.getElementById('activeMatchAltsSelect');
             if (altsSelect) {
