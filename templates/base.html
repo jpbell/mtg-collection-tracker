@@ -1044,6 +1044,56 @@
 
         // --- Card Scanner Camera & OCR ---
         let mediaStream = null;
+        let currentZoom = 1.0;
+        let hardwareZoomActive = false;
+
+        function applyZoom(zoomVal) {
+            currentZoom = parseFloat(zoomVal);
+            const zoomValText = document.getElementById('cameraZoomVal');
+            if (zoomValText) {
+                zoomValText.textContent = currentZoom.toFixed(1) + 'x';
+            }
+            
+            const video = document.getElementById('scannerVideo');
+            if (!video) return;
+            
+            // 1. Try hardware zoom if stream and track are active
+            if (mediaStream) {
+                const tracks = mediaStream.getVideoTracks();
+                if (tracks && tracks.length > 0) {
+                    const track = tracks[0];
+                    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                    
+                    if (capabilities.zoom) {
+                        const minZoom = capabilities.zoom.min || 1;
+                        const maxZoom = capabilities.zoom.max || 1;
+                        const targetZoom = Math.max(minZoom, Math.min(maxZoom, currentZoom));
+                        
+                        track.applyConstraints({
+                            advanced: [{ zoom: targetZoom }]
+                        }).then(() => {
+                            const settings = track.getSettings();
+                            if (settings.zoom && Math.abs(settings.zoom - targetZoom) < 0.1) {
+                                hardwareZoomActive = true;
+                                video.style.transform = '';
+                                return;
+                            }
+                        }).catch(err => {
+                            console.warn("Hardware zoom failed, falling back to CSS/Canvas zoom:", err);
+                            hardwareZoomActive = false;
+                            video.style.transform = `scale(${currentZoom})`;
+                            video.style.transformOrigin = 'center';
+                        });
+                        return;
+                    }
+                }
+            }
+            
+            // Fallback: CSS digital zoom
+            hardwareZoomActive = false;
+            video.style.transform = `scale(${currentZoom})`;
+            video.style.transformOrigin = 'center';
+        }
 
         function startCamera(deviceId = null) {
             const video = document.getElementById('scannerVideo');
@@ -1082,6 +1132,7 @@
                     mediaStream = stream;
                     video.srcObject = stream;
                     updateCameraList();
+                    applyZoom(currentZoom);
                 })
                 .catch(err => {
                     console.error("Camera access error:", err);
@@ -1340,6 +1391,18 @@
                         torchBtnText.textContent = 'Torch On';
                         torchBtn.style.background = '';
                     }
+                    
+                    // Reset zoom to 1.0 when opening the scanner modal
+                    const zoomSlider = document.getElementById('cameraZoomSlider');
+                    const zoomValText = document.getElementById('cameraZoomVal');
+                    if (zoomSlider && zoomValText) {
+                        zoomSlider.value = 1.0;
+                        zoomValText.textContent = '1.0x';
+                    }
+                    currentZoom = 1.0;
+                    hardwareZoomActive = false;
+                    if (video) video.style.transform = '';
+                    
                     scannerModal.style.display = 'flex';
                     startCamera();
                 });
@@ -1364,6 +1427,14 @@
                     cropOffsetPercent = parseInt(e.target.value);
                     sliderVal.textContent = cropOffsetPercent + '%';
                     guideBox.style.top = cropOffsetPercent + '%';
+                });
+            }
+            
+            // Zoom Slider listener
+            const zoomSlider = document.getElementById('cameraZoomSlider');
+            if (zoomSlider) {
+                zoomSlider.addEventListener('input', (e) => {
+                    applyZoom(e.target.value);
                 });
             }
             
@@ -1435,10 +1506,24 @@
                     
                     // Guide box is: top: 15%, left: 10%, width: 80%, height: 12%
                     // We crop 90% of the box's width to ensure long card names are not truncated
-                    const sx = videoWidth * 0.1;
-                    const sy = videoHeight * (cropOffsetPercent / 100);
-                    const sw = videoWidth * 0.8 * 0.9;
-                    const sh = videoHeight * 0.12;
+                    const left_s = 0.1;
+                    const top_s = cropOffsetPercent / 100;
+                    const width_s = 0.8 * 0.9;
+                    const height_s = 0.12;
+
+                    let sx, sy, sw, sh;
+                    if (hardwareZoomActive) {
+                        sx = videoWidth * left_s;
+                        sy = videoHeight * top_s;
+                        sw = videoWidth * width_s;
+                        sh = videoHeight * height_s;
+                    } else {
+                        const Z = currentZoom;
+                        sx = videoWidth * (0.5 + (left_s - 0.5) / Z);
+                        sy = videoHeight * (0.5 + (top_s - 0.5) / Z);
+                        sw = videoWidth * (width_s / Z);
+                        sh = videoHeight * (height_s / Z);
+                    }
                     
                     // Upscale the cropped image by 2x for much higher OCR accuracy
                     canvas.width = sw * 2;
@@ -1595,6 +1680,11 @@
                     <button type="button" id="torchBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; height: 28px;">
                         <span>🔦</span> <span id="torchBtnText">Torch On</span>
                     </button>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 160px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Zoom:</span>
+                    <input type="range" id="cameraZoomSlider" min="1" max="4" step="0.1" value="1" style="flex: 1; accent-color: var(--accent-purple); height: 4px; cursor: pointer;">
+                    <span id="cameraZoomVal" style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; width: 25px; text-align: right;">1.0x</span>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 160px;">
                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Crop Height:</span>
