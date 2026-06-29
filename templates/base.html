@@ -1262,9 +1262,72 @@
                         return;
                     }
                     
+                    // Display the image of the first match as the default preview
+                    const firstCard = data.data[0];
+                    let firstImg = '';
+                    if (firstCard.image_uris && (firstCard.image_uris.normal || firstCard.image_uris.small)) {
+                        firstImg = firstCard.image_uris.normal || firstCard.image_uris.small;
+                    } else if (firstCard.card_faces && firstCard.card_faces[0].image_uris) {
+                        firstImg = firstCard.card_faces[0].image_uris.normal || firstCard.card_faces[0].image_uris.small;
+                    }
+                    
+                    const sidePreviewImg = document.getElementById('scannerCardImagePreview');
+                    const sidePlaceholder = document.getElementById('scannerCardImagePlaceholder');
+                    if (sidePreviewImg && sidePlaceholder) {
+                        if (firstImg) {
+                            sidePreviewImg.src = firstImg;
+                            sidePreviewImg.style.display = 'block';
+                            sidePlaceholder.style.display = 'none';
+                        } else {
+                            sidePreviewImg.style.display = 'none';
+                            sidePlaceholder.style.display = 'block';
+                        }
+                    }
+                    
                     data.data.slice(0, 10).forEach(card => {
                         const itemDiv = document.createElement('div');
-                        itemDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px; font-size: 0.85rem; gap: 10px;';
+                        itemDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px; font-size: 0.85rem; gap: 10px; cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease;';
+                        
+                        // Hover effect to highlight item and update preview image
+                        itemDiv.addEventListener('mouseenter', () => {
+                            itemDiv.style.background = 'rgba(255, 255, 255, 0.05)';
+                            itemDiv.style.borderColor = 'var(--accent-purple)';
+                            
+                            let cardImg = '';
+                            if (card.image_uris && (card.image_uris.normal || card.image_uris.small)) {
+                                cardImg = card.image_uris.normal || card.image_uris.small;
+                            } else if (card.card_faces && card.card_faces[0].image_uris) {
+                                cardImg = card.card_faces[0].image_uris.normal || card.card_faces[0].image_uris.small;
+                            }
+                            if (sidePreviewImg && sidePlaceholder) {
+                                if (cardImg) {
+                                    sidePreviewImg.src = cardImg;
+                                    sidePreviewImg.style.display = 'block';
+                                    sidePlaceholder.style.display = 'none';
+                                } else {
+                                    sidePreviewImg.style.display = 'none';
+                                    sidePlaceholder.style.display = 'block';
+                                }
+                            }
+                        });
+                        itemDiv.addEventListener('mouseleave', () => {
+                            itemDiv.style.background = 'rgba(255,255,255,0.02)';
+                            itemDiv.style.borderColor = 'var(--panel-border)';
+                        });
+                        
+                        // Insert tiny thumbnail on the left
+                        const thumbImg = document.createElement('img');
+                        let thumbSrc = '';
+                        if (card.image_uris && card.image_uris.small) {
+                            thumbSrc = card.image_uris.small;
+                        } else if (card.card_faces && card.card_faces[0].image_uris && card.card_faces[0].image_uris.small) {
+                            thumbSrc = card.card_faces[0].image_uris.small;
+                        }
+                        if (thumbSrc) {
+                            thumbImg.src = thumbSrc;
+                            thumbImg.style.cssText = 'width: 28px; height: 39px; object-fit: contain; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;';
+                            itemDiv.appendChild(thumbImg);
+                        }
                         
                         const infoDiv = document.createElement('div');
                         infoDiv.style.cssText = 'flex-grow: 1; min-width: 0;';
@@ -1831,9 +1894,17 @@
                 <div id="ocrResultText" style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-top: 4px; display: none; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);"></div>
             </div>
 
-            <div id="scannerResultsContainer" style="display: none; flex-direction: column; gap: 8px;">
+            <div id="scannerResultsContainer" style="display: none; flex-direction: column; gap: 10px;">
                 <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Matching Printings</div>
-                <div id="scannerResultsList" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; scrollbar-width: thin;"></div>
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <!-- Left: Selected Card Image Preview -->
+                    <div id="scannerCardImagePreviewContainer" style="width: 120px; height: 167px; flex-shrink: 0; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                        <img id="scannerCardImagePreview" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Card Image Preview">
+                        <div id="scannerCardImagePlaceholder" style="font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 10px; font-family: sans-serif;">No card selected</div>
+                    </div>
+                    <!-- Right: List of matching printings -->
+                    <div id="scannerResultsList" style="flex: 1; display: flex; flex-direction: column; gap: 6px; max-height: 167px; overflow-y: auto; scrollbar-width: thin;"></div>
+                </div>
             </div>
 
             <!-- Tips Panel -->
