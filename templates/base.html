@@ -1213,6 +1213,12 @@
             runOCR(canvas.toDataURL('image/png'), true);
         }
 
+        let currentMatchedPrintings = [];
+        let currentSelectedPrinting = null;
+        let sessionScanQueue = [];
+        let defaultIsFoil = false;
+        let defaultCondition = 'Near Mint';
+
         function handleAutoOCRResult(text) {
             const autoStatus = document.getElementById('autoScanStatusText');
             
@@ -1240,20 +1246,28 @@
                 return;
             }
             
+            processScannedCardName(text);
+        }
+
+        function processScannedCardName(name) {
+            const container = document.getElementById('activeMatchContainer');
+            if (!container) return;
+            
+            const autoStatus = document.getElementById('autoScanStatusText');
             if (autoStatus) {
-                autoStatus.textContent = `⚡ Querying: "${text}"...`;
+                autoStatus.textContent = `🔍 Querying: "${name}"...`;
                 autoStatus.style.color = "var(--accent-purple)";
             }
             
-            autoSummonCardByName(text);
-        }
-
-        function autoSummonCardByName(name) {
-            const autoStatus = document.getElementById('autoScanStatusText');
-            
-            fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}`)
+            fetch(`https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(name)}"`)
                 .then(res => {
-                    if (!res.ok) throw new Error("No match.");
+                    if (!res.ok) {
+                        return fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}`);
+                    }
+                    return res;
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error("No printings found.");
                     return res.json();
                 })
                 .then(data => {
@@ -1261,60 +1275,270 @@
                         throw new Error("No cards.");
                     }
                     
-                    const card = data.data[0];
+                    currentMatchedPrintings = data.data;
+                    currentSelectedPrinting = data.data[0];
                     
-                    const formData = new FormData();
-                    formData.append('set_code', card.set.toUpperCase());
-                    formData.append('collector_number', card.collector_number);
-                    formData.append('condition', 'Near Mint');
+                    container.style.display = 'flex';
                     
-                    fetch('/add', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(addRes => {
-                        if (addRes.ok) {
-                            lastScannedName = card.name;
-                            window.scannerMadeAdditions = true;
-                            window.sessionSummonCount = (window.sessionSummonCount || 0) + 1;
-                            
-                            const badge = document.getElementById('sessionCounterBadge');
-                            if (badge) {
-                                badge.textContent = `${window.sessionSummonCount} Summoned`;
-                                badge.style.display = 'inline-block';
+                    const select = document.getElementById('activeMatchAltsSelect');
+                    if (select) {
+                        select.innerHTML = '';
+                        currentMatchedPrintings.forEach((card, idx) => {
+                            const option = document.createElement('option');
+                            option.value = idx;
+                            const foilPrice = card.prices.usd_foil ? `$${card.prices.usd_foil}` : 'N/A';
+                            const normalPrice = card.prices.usd ? `$${card.prices.usd}` : 'N/A';
+                            option.textContent = `${card.set.toUpperCase()} #${card.collector_number} (Normal: ${normalPrice}, Foil: ${foilPrice})`;
+                            if (card.id === currentSelectedPrinting.id) {
+                                option.selected = true;
                             }
-                            
-                            if (autoStatus) {
-                                autoStatus.textContent = `🎉 Added: ${card.name}!`;
-                                autoStatus.style.color = "var(--accent-green)";
-                            }
-                            
-                            playBeep(650, 0.12);
-                            
-                            const guideBox = document.getElementById('scannerGuideBox');
-                            if (guideBox) {
-                                guideBox.classList.add('scan-success-flash');
-                                setTimeout(() => {
-                                    guideBox.classList.remove('scan-success-flash');
-                                }, 1000);
-                            }
-                            
-                            searchScryfallForScanner(card.name);
-                        } else {
-                            if (autoStatus) {
-                                autoStatus.textContent = `❌ Failed to add "${card.name}"`;
-                                autoStatus.style.color = "var(--accent-red)";
-                            }
+                            select.appendChild(option);
+                        });
+                    }
+                    
+                    renderActiveMatchDetails();
+                    
+                    if (isScanningActive) {
+                        summonCurrentSelectedPrinting(true);
+                    } else {
+                        const summonBtn = document.getElementById('activeMatchSummonBtn');
+                        if (summonBtn) {
+                            summonBtn.style.display = 'flex';
+                            summonBtn.disabled = false;
+                            summonBtn.querySelector('span:last-child').textContent = "Summon Card";
+                            summonBtn.style.background = 'var(--accent-purple)';
                         }
-                    });
+                    }
                 })
                 .catch(err => {
-                    console.warn("Auto-summon failed:", err);
+                    console.error("Scryfall lookup failed:", err);
                     if (autoStatus) {
                         autoStatus.textContent = `⚠️ No match for: "${name}"`;
                         autoStatus.style.color = "var(--accent-orange)";
                     }
                 });
+        }
+
+        function renderActiveMatchDetails() {
+            if (!currentSelectedPrinting) return;
+            const card = currentSelectedPrinting;
+            
+            const imgEl = document.getElementById('activeMatchImage');
+            if (imgEl) {
+                let imgUrl = '';
+                if (card.image_uris && card.image_uris.normal) {
+                    imgUrl = card.image_uris.normal;
+                } else if (card.card_faces && card.card_faces[0].image_uris && card.card_faces[0].image_uris.normal) {
+                    imgUrl = card.card_faces[0].image_uris.normal;
+                }
+                imgEl.src = imgUrl;
+            }
+            
+            const nameEl = document.getElementById('activeMatchName');
+            if (nameEl) nameEl.textContent = card.name;
+            
+            const setInfoEl = document.getElementById('activeMatchSetInfo');
+            if (setInfoEl) {
+                setInfoEl.textContent = `${card.set.toUpperCase()} #${card.collector_number} · ${card.rarity.toUpperCase()}`;
+            }
+            
+            const priceEl = document.getElementById('activeMatchPrice');
+            if (priceEl) {
+                const isFoil = defaultIsFoil;
+                const priceKey = isFoil ? 'usd_foil' : 'usd';
+                const priceVal = card.prices[priceKey] || card.prices.usd || '0.00';
+                priceEl.textContent = `$${priceVal}`;
+            }
+            
+            const badge = document.getElementById('activeMatchStatusBadge');
+            if (badge) {
+                badge.textContent = "Matched";
+                badge.style.background = "var(--accent-purple)";
+            }
+        }
+
+        function summonCurrentSelectedPrinting(isAuto = false) {
+            if (!currentSelectedPrinting) return;
+            const card = currentSelectedPrinting;
+            
+            const summonBtn = document.getElementById('activeMatchSummonBtn');
+            const autoStatus = document.getElementById('autoScanStatusText');
+            
+            if (!isAuto && summonBtn) {
+                summonBtn.disabled = true;
+                summonBtn.querySelector('span:last-child').textContent = "Summoning...";
+            }
+            
+            const formData = new FormData();
+            formData.append('set_code', card.set.toUpperCase());
+            formData.append('collector_number', card.collector_number);
+            formData.append('condition', defaultCondition);
+            if (defaultIsFoil) {
+                formData.append('is_foil', 'y');
+            }
+            
+            fetch('/api/add', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Add failed.");
+                return res.json();
+            })
+            .then(addedCard => {
+                lastScannedName = card.name;
+                window.scannerMadeAdditions = true;
+                window.sessionSummonCount = (window.sessionSummonCount || 0) + 1;
+                
+                const badge = document.getElementById('sessionCounterBadge');
+                if (badge) {
+                    badge.textContent = `${window.sessionSummonCount} Summoned`;
+                    badge.style.display = 'inline-block';
+                }
+                
+                playBeep(650, 0.12);
+                
+                const guideBox = document.getElementById('scannerGuideBox');
+                if (guideBox) {
+                    guideBox.classList.add('scan-success-flash');
+                    setTimeout(() => {
+                        guideBox.classList.remove('scan-success-flash');
+                    }, 1000);
+                }
+                
+                if (autoStatus) {
+                    autoStatus.textContent = `🎉 Added: ${card.name}!`;
+                    autoStatus.style.color = "var(--accent-green)";
+                }
+                
+                const activeBadge = document.getElementById('activeMatchStatusBadge');
+                if (activeBadge) {
+                    activeBadge.textContent = "Summoned";
+                    activeBadge.style.background = "var(--accent-green)";
+                }
+                
+                if (summonBtn) {
+                    summonBtn.disabled = true;
+                    summonBtn.querySelector('span:last-child').textContent = "Added to Vault ✓";
+                    summonBtn.style.background = "var(--accent-green)";
+                }
+                
+                sessionScanQueue.unshift({
+                    id: addedCard.card_id,
+                    name: addedCard.name,
+                    set_code: addedCard.set_code,
+                    collector_number: addedCard.collector_number,
+                    is_foil: addedCard.is_foil,
+                    condition: addedCard.condition,
+                    price: addedCard.price,
+                    image_url: addedCard.image_url
+                });
+                renderSessionQueue();
+            })
+            .catch(err => {
+                console.error("Add card failed:", err);
+                if (summonBtn) {
+                    summonBtn.disabled = false;
+                    summonBtn.querySelector('span:last-child').textContent = "Failed - Try Again";
+                    summonBtn.style.background = "var(--accent-red)";
+                }
+                if (autoStatus) {
+                    autoStatus.textContent = `❌ Failed: "${card.name}"`;
+                    autoStatus.style.color = "var(--accent-red)";
+                }
+            });
+        }
+
+        function renderSessionQueue() {
+            const list = document.getElementById('sessionQueueList');
+            const container = document.getElementById('sessionQueueContainer');
+            const totalEl = document.getElementById('sessionQueueTotal');
+            if (!list || !container) return;
+            
+            if (sessionScanQueue.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'flex';
+            list.innerHTML = '';
+            
+            let totalValue = 0;
+            
+            sessionScanQueue.forEach((item, index) => {
+                totalValue += parseFloat(item.price || 0);
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px; font-size: 0.8rem; gap: 8px;';
+                
+                const thumb = document.createElement('img');
+                thumb.src = item.image_url;
+                thumb.style.cssText = 'width: 20px; height: 28px; object-fit: contain; border-radius: 3px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;';
+                itemDiv.appendChild(thumb);
+                
+                const info = document.createElement('div');
+                info.style.cssText = 'flex-grow: 1; min-width: 0;';
+                const foilLabel = item.is_foil ? ' <span style="background: linear-gradient(135deg, #ec4899, #3b82f6); color: #0c0a1c; font-size: 0.58rem; padding: 1px 4px; border-radius: 3px; font-weight: 800; text-transform: uppercase;">Foil</span>' : '';
+                info.innerHTML = `<div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px;">${item.name}${foilLabel}</div><div style="color: var(--text-muted); font-size: 0.65rem; margin-top: 1px;">${item.set_code} #${item.collector_number} · ${item.condition}</div>`;
+                itemDiv.appendChild(info);
+                
+                const rightDiv = document.createElement('div');
+                rightDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; flex-shrink: 0;';
+                
+                const price = document.createElement('span');
+                price.style.cssText = 'font-weight: 700; color: var(--accent-cyan); font-size: 0.78rem;';
+                price.textContent = `$${parseFloat(item.price || 0).toFixed(2)}`;
+                rightDiv.appendChild(price);
+                
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.style.cssText = 'background: none; border: none; color: var(--text-muted); font-size: 0.9rem; cursor: pointer; padding: 4px; transition: color 0.2s; outline: none; line-height: 1;';
+                delBtn.innerHTML = '🗑️';
+                delBtn.title = "Delete Scan";
+                delBtn.addEventListener('mouseenter', () => delBtn.style.color = 'var(--accent-red)');
+                delBtn.addEventListener('mouseleave', () => delBtn.style.color = 'var(--text-muted)');
+                
+                delBtn.addEventListener('click', () => {
+                    delBtn.disabled = true;
+                    delBtn.style.opacity = '0.3';
+                    
+                    fetch(`/api/delete/${item.id}`, { method: 'POST' })
+                        .then(res => {
+                            if (res.ok) {
+                                playBeep(350, 0.15);
+                                sessionScanQueue.splice(index, 1);
+                                renderSessionQueue();
+                                
+                                window.sessionSummonCount = Math.max(0, window.sessionSummonCount - 1);
+                                const badge = document.getElementById('sessionCounterBadge');
+                                if (badge) {
+                                    if (window.sessionSummonCount > 0) {
+                                        badge.textContent = `${window.sessionSummonCount} Summoned`;
+                                    } else {
+                                        badge.style.display = 'none';
+                                    }
+                                }
+                            } else {
+                                delBtn.disabled = false;
+                                delBtn.style.opacity = '1';
+                                alert("Failed to delete card.");
+                            }
+                        })
+                        .catch(err => {
+                            delBtn.disabled = false;
+                            delBtn.style.opacity = '1';
+                            console.error(err);
+                        });
+                });
+                rightDiv.appendChild(delBtn);
+                
+                itemDiv.appendChild(rightDiv);
+                list.appendChild(itemDiv);
+            });
+            
+            if (totalEl) {
+                totalEl.textContent = `${sessionScanQueue.length} card${sessionScanQueue.length > 1 ? 's' : ''} · $${totalValue.toFixed(2)}`;
+            }
         }
 
         function applyZoom(zoomVal) {
@@ -1528,205 +1752,72 @@
                 } else {
                     ocrLoader.style.display = 'none';
                     ocrResultText.textContent = "OCR engine error. Try uploading a high-contrast file.";
-                    ocrResultText.style.display = 'block';
-                }
-            });
-        }
-
-        function searchScryfallForScanner(name) {
-            const list = document.getElementById('scannerResultsList');
-            const container = document.getElementById('scannerResultsContainer');
-            if (!list || !container) return;
-            
-            list.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">Querying Scryfall printings...</div>';
-            container.style.display = 'flex';
-
-            let query = name.replace(/\s+/g, ' ').trim();
-            
-            const doSearch = (searchQuery, isFallback = false) => {
-                fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchQuery)}`)
-                    .then(res => {
-                        if (!res.ok) throw new Error("No printings found.");
-                        return res.json();
-                    })
-                    .then(data => {
-                    list.innerHTML = '';
-                    if (!data.data || data.data.length === 0) {
-                        list.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">No matches found on Scryfall.</div>';
-                        return;
-                    }
-                    
-                    // Display the image of the first match as the default preview
-                    const firstCard = data.data[0];
-                    let firstImg = '';
-                    if (firstCard.image_uris && (firstCard.image_uris.normal || firstCard.image_uris.small)) {
-                        firstImg = firstCard.image_uris.normal || firstCard.image_uris.small;
-                    } else if (firstCard.card_faces && firstCard.card_faces[0].image_uris) {
-                        firstImg = firstCard.card_faces[0].image_uris.normal || firstCard.card_faces[0].image_uris.small;
-                    }
-                    
-                    const sidePreviewImg = document.getElementById('scannerCardImagePreview');
-                    const sidePlaceholder = document.getElementById('scannerCardImagePlaceholder');
-                    if (sidePreviewImg && sidePlaceholder) {
-                        if (firstImg) {
-                            sidePreviewImg.src = firstImg;
-                            sidePreviewImg.style.display = 'block';
-                            sidePlaceholder.style.display = 'none';
-                        } else {
-                            sidePreviewImg.style.display = 'none';
-                            sidePlaceholder.style.display = 'block';
-                        }
-                    }
-                    
-                    data.data.slice(0, 10).forEach(card => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: 8px; font-size: 0.85rem; gap: 10px; cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease;';
-                        
-                        // Hover effect to highlight item and update preview image
-                        itemDiv.addEventListener('mouseenter', () => {
-                            itemDiv.style.background = 'rgba(255, 255, 255, 0.05)';
-                            itemDiv.style.borderColor = 'var(--accent-purple)';
-                            
-                            let cardImg = '';
-                            if (card.image_uris && (card.image_uris.normal || card.image_uris.small)) {
-                                cardImg = card.image_uris.normal || card.image_uris.small;
-                            } else if (card.card_faces && card.card_faces[0].image_uris) {
-                                cardImg = card.card_faces[0].image_uris.normal || card.card_faces[0].image_uris.small;
+                    ocrResultText.style.display         // Initialize ManaBox UI Listeners
+        function setupManaBoxUIListeners() {
+            const altsSelect = document.getElementById('activeMatchAltsSelect');
+            if (altsSelect) {
+                altsSelect.addEventListener('change', (e) => {
+                    const idx = parseInt(e.target.value);
+                    if (currentMatchedPrintings[idx]) {
+                        currentSelectedPrinting = currentMatchedPrintings[idx];
+                        renderActiveMatchDetails();
+                        if (!isScanningActive) {
+                            const summonBtn = document.getElementById('activeMatchSummonBtn');
+                            if (summonBtn) {
+                                summonBtn.disabled = false;
+                                summonBtn.querySelector('span:last-child').textContent = "Summon Card";
+                                summonBtn.style.background = 'var(--accent-purple)';
                             }
-                            if (sidePreviewImg && sidePlaceholder) {
-                                if (cardImg) {
-                                    sidePreviewImg.src = cardImg;
-                                    sidePreviewImg.style.display = 'block';
-                                    sidePlaceholder.style.display = 'none';
-                                } else {
-                                    sidePreviewImg.style.display = 'none';
-                                    sidePlaceholder.style.display = 'block';
-                                }
-                            }
-                        });
-                        itemDiv.addEventListener('mouseleave', () => {
-                            itemDiv.style.background = 'rgba(255,255,255,0.02)';
-                            itemDiv.style.borderColor = 'var(--panel-border)';
-                        });
-                        
-                        // Insert tiny thumbnail on the left
-                        const thumbImg = document.createElement('img');
-                        let thumbSrc = '';
-                        if (card.image_uris && card.image_uris.small) {
-                            thumbSrc = card.image_uris.small;
-                        } else if (card.card_faces && card.card_faces[0].image_uris && card.card_faces[0].image_uris.small) {
-                            thumbSrc = card.card_faces[0].image_uris.small;
-                        }
-                        if (thumbSrc) {
-                            thumbImg.src = thumbSrc;
-                            thumbImg.style.cssText = 'width: 28px; height: 39px; object-fit: contain; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;';
-                            itemDiv.appendChild(thumbImg);
-                        }
-                        
-                        const infoDiv = document.createElement('div');
-                        infoDiv.style.cssText = 'flex-grow: 1; min-width: 0;';
-                        infoDiv.innerHTML = `<div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${card.name}</div><div style="color: var(--text-muted); font-size: 0.72rem; margin-top: 2px;">${card.set.toUpperCase()} #${card.collector_number} · ${card.rarity}</div>`;
-                        itemDiv.appendChild(infoDiv);
-                        
-                        const actionsDiv = document.createElement('div');
-                        actionsDiv.style.cssText = 'display: flex; gap: 6px; flex-shrink: 0;';
-                        
-                        const createSummonBtn = (isFoil) => {
-                            const btn = document.createElement('button');
-                            btn.type = 'button';
-                            btn.className = 'btn';
-                            if (isFoil) {
-                                btn.style.cssText = 'padding: 4px 8px; font-size: 0.7rem; border-radius: 6px; background: linear-gradient(135deg, #ec4899, #3b82f6); border: none; color: #0c0a1c; font-weight: 800; cursor: pointer;';
-                                btn.textContent = 'Foil';
-                            } else {
-                                btn.style.cssText = 'padding: 4px 8px; font-size: 0.7rem; border-radius: 6px; background: var(--accent-purple); border: none; color: #fff; font-weight: 700; cursor: pointer;';
-                                btn.textContent = 'Normal';
-                            }
-                            
-                            btn.addEventListener('click', () => {
-                                btn.disabled = true;
-                                btn.textContent = '...';
-                                btn.style.opacity = '0.6';
-                                
-                                const formData = new FormData();
-                                formData.append('set_code', card.set.toUpperCase());
-                                formData.append('collector_number', card.collector_number);
-                                formData.append('condition', 'Near Mint');
-                                if (isFoil) {
-                                    formData.append('is_foil', 'y');
-                                }
-                                
-                                fetch('/add', {
-                                    method: 'POST',
-                                    body: formData
-                                })
-                                .then(res => {
-                                    if (res.ok) {
-                                        btn.textContent = '✓';
-                                        btn.style.background = 'var(--accent-green)';
-                                        btn.style.color = '#fff';
-                                        btn.style.fontWeight = 'bold';
-                                        
-                                        window.scannerMadeAdditions = true;
-                                        window.sessionSummonCount = (window.sessionSummonCount || 0) + 1;
-                                        const badge = document.getElementById('sessionCounterBadge');
-                                        if (badge) {
-                                            badge.textContent = `${window.sessionSummonCount} Summoned`;
-                                            badge.style.display = 'inline-block';
-                                        }
-                                        
-                                        const ocrResultText = document.getElementById('ocrResultText');
-                                        if (ocrResultText) {
-                                            ocrResultText.innerHTML = `<span style="color: var(--accent-green);">🟢 Successfully summoned ${card.name} (${isFoil ? 'Foil' : 'Normal'})!</span>`;
-                                        }
-                                    } else {
-                                        btn.disabled = false;
-                                        btn.textContent = isFoil ? 'Foil' : 'Normal';
-                                        btn.style.opacity = '1';
-                                        btn.style.background = isFoil ? 'linear-gradient(135deg, #ec4899, #3b82f6)' : 'var(--accent-purple)';
-                                        btn.style.color = isFoil ? '#0c0a1c' : '#fff';
-                                        alert("Failed to summon card.");
-                                    }
-                                })
-                                .catch(err => {
-                                    btn.disabled = false;
-                                    btn.textContent = isFoil ? 'Foil' : 'Normal';
-                                    btn.style.opacity = '1';
-                                    btn.style.background = isFoil ? 'linear-gradient(135deg, #ec4899, #3b82f6)' : 'var(--accent-purple)';
-                                    btn.style.color = isFoil ? '#0c0a1c' : '#fff';
-                                    console.error(err);
-                                    alert("Error: " + err.message);
-                                });
-                            });
-                            return btn;
-                        };
-                        
-                        if (card.nonfoil !== false) {
-                            actionsDiv.appendChild(createSummonBtn(false));
-                        }
-                        if (card.foil !== false) {
-                            actionsDiv.appendChild(createSummonBtn(true));
-                        }
-                        
-                        itemDiv.appendChild(actionsDiv);
-                        list.appendChild(itemDiv);
-                    });
-                })
-                .catch(err => {
-                    if (!isFallback) {
-                        const words = searchQuery.split(' ');
-                        if (words.length > 1) {
-                            const fallbackQuery = words.slice(0, -1).join(' ');
-                            console.log(`Search failed for "${searchQuery}". Trying fallback: "${fallbackQuery}"`);
-                            doSearch(fallbackQuery, true);
-                            return;
                         }
                     }
-                    list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">Scryfall search failed: ${err.message}</div>`;
                 });
-            };
-
-            doSearch(query);
+            }
+            
+            const summonBtn = document.getElementById('activeMatchSummonBtn');
+            if (summonBtn) {
+                summonBtn.addEventListener('click', () => {
+                    summonCurrentSelectedPrinting(false);
+                });
+            }
+            
+            const normalBtn = document.getElementById('prefFoilNormalBtn');
+            const foilBtn = document.getElementById('prefFoilFoilBtn');
+            if (normalBtn && foilBtn) {
+                normalBtn.addEventListener('click', () => {
+                    defaultIsFoil = false;
+                    normalBtn.style.background = 'var(--accent-purple)';
+                    normalBtn.style.color = '#fff';
+                    foilBtn.style.background = 'transparent';
+                    foilBtn.style.color = 'var(--text-muted)';
+                    renderActiveMatchDetails();
+                });
+                foilBtn.addEventListener('click', () => {
+                    defaultIsFoil = true;
+                    foilBtn.style.background = 'var(--accent-purple)';
+                    foilBtn.style.color = '#fff';
+                    normalBtn.style.background = 'transparent';
+                    normalBtn.style.color = 'var(--text-muted)';
+                    renderActiveMatchDetails();
+                });
+            }
+            
+            const condSelect = document.getElementById('prefConditionSelect');
+            if (condSelect) {
+                condSelect.addEventListener('change', (e) => {
+                    defaultCondition = e.target.value;
+                });
+            }
+            
+            const toggleBtn = document.getElementById('toggleCalibrationBtn');
+            const calContent = document.getElementById('calibrationContent');
+            const calArrow = document.getElementById('calibrationArrow');
+            if (toggleBtn && calContent && calArrow) {
+                toggleBtn.addEventListener('click', () => {
+                    const isOpen = calContent.style.display === 'flex';
+                    calContent.style.display = isOpen ? 'none' : 'flex';
+                    calArrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+                });
+            }
         }
 
         // Initialize scanner listeners
@@ -1778,12 +1869,22 @@
             if (guideBox) {
                 guideBox.style.top = savedCropOffset + '%';
             }
+            setupManaBoxUIListeners();
             
             if (openScanner && scannerModal) {
                 openScanner.addEventListener('click', () => {
                     window.scannerMadeAdditions = false;
                     window.sessionSummonCount = 0;
                     torchEnabled = false;
+                    
+                    // Reset active match and session history queue
+                    sessionScanQueue = [];
+                    renderSessionQueue();
+                    const activeContainer = document.getElementById('activeMatchContainer');
+                    if (activeContainer) {
+                        activeContainer.style.display = 'none';
+                    }
+                    
                     const badge = document.getElementById('sessionCounterBadge');
                     if (badge) {
                         badge.style.display = 'none';
@@ -1928,7 +2029,7 @@
                 const previewContainer = document.getElementById('cropPreviewContainer');
                 if (previewContainer) previewContainer.style.display = 'none';
                 
-                searchScryfallForScanner(query);
+                processScannedCardName(query);
             };
             
             if (scannerSearchBtn && scannerSearchInput) {
@@ -2177,6 +2278,7 @@
                 <button type="button" id="closeScannerModalBtn" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
             </div>
             
+            <!-- Row 1: Camera settings -->
             <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; flex-shrink: 0; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border);">
                 <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 140px;">
                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Camera:</span>
@@ -2209,6 +2311,28 @@
                 </div>
             </div>
 
+            <!-- Row 2: ManaBox Scan Pre-settings -->
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; flex-shrink: 0; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); margin-top: -5px;">
+                <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 140px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Type:</span>
+                    <div style="display: flex; background: rgba(0,0,0,0.3); padding: 2px; border-radius: 6px; border: 1px solid var(--panel-border);">
+                        <button type="button" id="prefFoilNormalBtn" style="padding: 3px 8px; font-size: 0.75rem; border: none; border-radius: 4px; background: var(--accent-purple); color: #fff; font-weight: bold; cursor: pointer; transition: all 0.2s;">Normal</button>
+                        <button type="button" id="prefFoilFoilBtn" style="padding: 3px 8px; font-size: 0.75rem; border: none; border-radius: 4px; background: transparent; color: var(--text-muted); font-weight: bold; cursor: pointer; transition: all 0.2s;">Foil</button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex: 1.5; min-width: 220px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Condition:</span>
+                    <select id="prefConditionSelect" style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; outline: none;">
+                        <option value="Near Mint">Near Mint</option>
+                        <option value="Lightly Played">Lightly Played</option>
+                        <option value="Moderately Played">Moderately Played</option>
+                        <option value="Heavily Played">Heavily Played</option>
+                        <option value="Damaged">Damaged</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Webcam Feed Viewport -->
             <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
                 <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill;"></video>
                 <div id="scannerGuideBox" style="position: absolute; top: 15%; left: 10%; width: 80%; height: 12%; border: 3px dashed var(--accent-purple); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); display: flex; flex-direction: column; align-items: center; justify-content: center;">
@@ -2220,6 +2344,7 @@
                 </div>
             </div>
 
+            <!-- Manual Trigger Buttons Row -->
             <div style="display: flex; gap: 10px; flex-shrink: 0;">
                 <button type="button" id="captureBtn" class="btn" style="flex: 1; padding: 10px; background: var(--accent-purple); font-weight: 700; font-size: 0.85rem; border-radius: 8px; border: none; color: #fff; cursor: pointer;">Capture & Scan</button>
                 <button type="button" id="uploadFileBtn" class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; border-radius: 8px; border: none; cursor: pointer; position: relative; font-weight: 700;">
@@ -2228,55 +2353,78 @@
                 </button>
             </div>
 
-            <!-- Scrollable Content Block (Manual Search, OCR Preview, Print Results, Tips) -->
+            <!-- Scrollable Content Block (ManaBox panels, Calibration sights) -->
             <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 4px; scrollbar-width: thin;">
 
-            <!-- Manual Search Bar Fallback -->
-            <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 4px; flex-shrink: 0;">
-                <input type="text" id="scannerSearchInput" placeholder="🔍 Or type card name to search..." style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; box-sizing: border-box; font-family: inherit;">
-                <button type="button" id="scannerSearchBtn" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; height: 35px; display: inline-flex; align-items: center; justify-content: center;">Search</button>
-            </div>
+                <!-- Manual Search Bar Fallback -->
+                <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 4px; flex-shrink: 0;">
+                    <input type="text" id="scannerSearchInput" placeholder="🔍 Or type card name to search..." style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; box-sizing: border-box; font-family: inherit;">
+                    <button type="button" id="scannerSearchBtn" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; height: 35px; display: inline-flex; align-items: center; justify-content: center;">Search</button>
+                </div>
 
-            <canvas id="scannerCanvas" style="display: none;"></canvas>
-            <canvas id="scannerFullCanvas" style="display: none;"></canvas>
+                <canvas id="scannerCanvas" style="display: none;"></canvas>
+                <canvas id="scannerFullCanvas" style="display: none;"></canvas>
 
-            <div id="cropPreviewContainer" style="display: none; flex-direction: column; gap: 12px; padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; flex-shrink: 0;">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Captured Card Preview</div>
-                    <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
-                        <img id="scannerFullPreview" style="width: 100%; height: 100%; object-fit: fill;" alt="Full Captured View">
-                        <div id="scannerCropHighlight" style="position: absolute; border: 2px dashed var(--accent-purple); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); pointer-events: none; border-radius: 4px; box-sizing: border-box;"></div>
+                <!-- Active Card Match Panel -->
+                <div id="activeMatchContainer" style="display: none; padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; flex-shrink: 0; gap: 15px; align-items: flex-start; margin-top: 5px;">
+                    <!-- Left: Card Image -->
+                    <div style="width: 100px; height: 139px; flex-shrink: 0; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                        <img id="activeMatchImage" style="width: 100%; height: 100%; object-fit: contain;" alt="Active Card Match">
+                    </div>
+                    <!-- Right: Details & Summon Button -->
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+                        <div>
+                            <h4 id="activeMatchName" style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Card Name</h4>
+                            <div id="activeMatchSetInfo" style="color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; font-weight: 600;">SET #123 · Rarity</div>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center; margin-top: 2px;">
+                            <span id="activeMatchPrice" style="font-size: 0.95rem; font-weight: 800; color: var(--accent-cyan);">$0.00</span>
+                            <span id="activeMatchStatusBadge" style="font-size: 0.65rem; background: var(--accent-purple); color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: bold; text-transform: uppercase;">Detected</span>
+                        </div>
+                        <!-- Manual Summon Action Button -->
+                        <button type="button" id="activeMatchSummonBtn" class="btn" style="width: 100%; padding: 8px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 6px; border: none; background: var(--accent-purple); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;">
+                            <span>🔮</span> <span>Summon Card</span>
+                        </button>
+                        <!-- Alternate Printings Dropdown -->
+                        <div id="activeMatchAltsContainer" style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Switch Printing:</span>
+                            <select id="activeMatchAltsSelect" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 4px 6px; border-radius: 6px; font-size: 0.75rem; outline: none;"></select>
+                        </div>
                     </div>
                 </div>
-                
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">OCR Scanner Sight (Cropped Text Area)</div>
-                    <img id="scannerCropPreview" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); filter: contrast(1.3) brightness(1.2); max-height: 50px; object-fit: contain; background: #000;" alt="Crop Sight Preview">
-                </div>
-            </div>
 
-            <div id="ocrStatusContainer" style="display: none; padding: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 8px; flex-shrink: 0;">
-                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">OCR Analysis</div>
-                <div id="ocrLoader" style="color: var(--accent-cyan); font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; border: 2px solid var(--accent-cyan); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
-                    <span>Reading text (0%)...</span>
-                </div>
-                <div id="ocrResultText" style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-top: 4px; display: none; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);"></div>
-            </div>
-
-            <div id="scannerResultsContainer" style="display: none; flex-direction: column; gap: 10px;">
-                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Matching Printings</div>
-                <div style="display: flex; gap: 12px; align-items: flex-start;">
-                    <!-- Left: Selected Card Image Preview -->
-                    <div id="scannerCardImagePreviewContainer" style="width: 120px; height: 167px; flex-shrink: 0; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-                        <img id="scannerCardImagePreview" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Card Image Preview">
-                        <div id="scannerCardImagePlaceholder" style="font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 10px; font-family: sans-serif;">No card selected</div>
+                <!-- Session Queue Panel -->
+                <div id="sessionQueueContainer" style="display: none; flex-direction: column; gap: 8px; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 5px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Session Scan History</span>
+                        <span id="sessionQueueTotal" style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 700;">0 cards · $0.00</span>
                     </div>
-                    <!-- Right: List of matching printings -->
-                    <div id="scannerResultsList" style="flex: 1; display: flex; flex-direction: column; gap: 6px; max-height: 167px; overflow-y: auto; scrollbar-width: thin;"></div>
+                    <div id="sessionQueueList" style="display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; scrollbar-width: thin; padding-right: 2px;"></div>
+                </div>
+
+                <!-- Collapsible Calibration Panel -->
+                <div style="border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: rgba(255,255,255,0.01); overflow: hidden; flex-shrink: 0; margin-top: 5px;">
+                    <button type="button" id="toggleCalibrationBtn" style="width: 100%; background: none; border: none; padding: 8px 12px; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; outline: none;">
+                        <span>⚙️ OCR Calibration Sights</span>
+                        <span id="calibrationArrow" style="transition: transform 0.2s ease;">▼</span>
+                    </button>
+                    <div id="calibrationContent" style="display: none; padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-direction: column; gap: 12px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Captured Card Preview</div>
+                            <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
+                                <img id="scannerFullPreview" style="width: 100%; height: 100%; object-fit: fill;" alt="Full Captured View">
+                                <div id="scannerCropHighlight" style="position: absolute; border: 2px dashed var(--accent-purple); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); pointer-events: none; border-radius: 4px; box-sizing: border-box;"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">OCR Scanner Sight (Cropped Text Area)</div>
+                            <img id="scannerCropPreview" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); filter: contrast(1.3) brightness(1.2); max-height: 40px; object-fit: contain; background: #000;" alt="Crop Sight Preview">
+                        </div>
+                    </div>
                 </div>
             </div>
-
+            
             <!-- Tips Panel -->
             <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;">
                 <span style="font-weight: 700; color: var(--accent-cyan); display: flex; align-items: center; gap: 4px;">💡 Tips for Perfect Scans:</span>

@@ -496,6 +496,141 @@ def add_card():
         flash(f"Failed to find card with Set '{request.form['set_code'].upper()}' and Collector Number '{request.form['collector_number']}'.", "error")
     return redirect(url_for('index'))
 
+@app.route('/api/add', methods=['POST'])
+def api_add_card():
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    set_code = request.form.get('set_code', '').strip().upper()
+    collector_number = request.form.get('collector_number', '').strip()
+    is_foil = request.form.get('is_foil') == 'y'
+    condition = request.form.get('condition', 'Near Mint').strip()
+    
+    if not set_code or not collector_number:
+        return jsonify({'error': 'Missing set_code or collector_number'}), 400
+        
+    url = f"https://api.scryfall.com/cards/{set_code.lower()}/{collector_number}"
+    res = requests.get(url, headers={"User-Agent": "MTGTracker/1.0"})
+    if res.status_code == 200:
+        d = res.json()
+        
+        # 1. Look for an exact match (same set, collector #, foil status, and condition)
+        existing_card = Card.query.filter_by(set_code=set_code, collector_number=collector_number, is_foil=is_foil, condition=condition, user_id=session.get('user_id')).first()
+        
+        # 2. Fallback: match by name, set, foil status, and condition for legacy/seeded records that have empty/null collector numbers
+        if not existing_card:
+            existing_card = Card.query.filter(
+                Card.user_id == session.get('user_id'),
+                Card.name == d['name'],
+                Card.set_code == set_code,
+                Card.is_foil == is_foil,
+                Card.condition == condition,
+                (Card.collector_number == None) | (Card.collector_number == "")
+            ).first()
+            if existing_card:
+                existing_card.collector_number = collector_number
+
+        if existing_card:
+            existing_card.quantity += 1
+            existing_card.last_summoned = datetime.utcnow()
+            db.session.commit()
+            record_snapshot()
+            return jsonify({
+                'success': True,
+                'card_id': existing_card.id,
+                'name': existing_card.name,
+                'set_code': existing_card.set_code,
+                'collector_number': existing_card.collector_number,
+                'is_foil': existing_card.is_foil,
+                'condition': existing_card.condition,
+                'quantity': existing_card.quantity,
+                'price': existing_card.price,
+                'image_url': existing_card.image_url or d.get('image_uris', {}).get('normal')
+            })
+        else:
+            price_key = 'usd_foil' if is_foil else 'usd'
+            base_price = float(d.get('prices', {}).get(price_key) or d.get('prices', {}).get('usd') or 0.0)
+            price = base_price * get_condition_multiplier(condition)
+            
+            mana_cost = d.get('mana_cost', '')
+            cmc = int(d.get('cmc', 0.0))
+            type_line = d.get('type_line', '')
+            colors = ",".join(d.get('colors', []))
+            
+            legalities = d.get('legalities', {})
+            major_formats = [
+                'standard', 'pioneer', 'modern', 'legacy', 'vintage', 
+                'commander', 'pauper', 'brawl', 'explorer', 'historic', 
+                'alchemy', 'timeless', 'oathbreaker'
+            ]
+            is_illegal = not any(legalities.get(fmt) in ['legal', 'restricted'] for fmt in major_formats)
+            is_modern = (legalities.get('modern') in ['legal', 'restricted'])
+            is_vintage = (legalities.get('vintage') in ['legal', 'restricted'])
+            released_at = d.get('released_at')
+            is_promo = d.get('promo', False)
+            promo_types_list = d.get('promo_types', [])
+            promo_types = ",".join(promo_types_list) if promo_types_list else None
+            
+            new_card = Card(
+                name=d['name'], set_code=set_code, 
+                collector_number=collector_number, 
+                rarity=d['rarity'], image_url=d.get('image_uris', {}).get('normal'), 
+                price=price,
+                acquired_price=price,
+                quantity=1,
+                is_foil=is_foil,
+                mana_cost=mana_cost,
+                cmc=cmc,
+                type_line=type_line,
+                colors=colors,
+                is_illegal=is_illegal,
+                user_id=session.get('user_id'),
+                condition=condition,
+                is_modern=is_modern,
+                is_vintage=is_vintage,
+                released_at=released_at,
+                last_summoned=datetime.utcnow(),
+                is_promo=is_promo,
+                promo_types=promo_types
+            )
+            db.session.add(new_card)
+            db.session.commit()
+            record_snapshot()
+            return jsonify({
+                'success': True,
+                'card_id': new_card.id,
+                'name': new_card.name,
+                'set_code': new_card.set_code,
+                'collector_number': new_card.collector_number,
+                'is_foil': new_card.is_foil,
+                'condition': new_card.condition,
+                'quantity': new_card.quantity,
+                'price': new_card.price,
+                'image_url': new_card.image_url
+            })
+            
+    return jsonify({'error': 'Failed to find or add card'}), 404
+
+@app.route('/api/delete/<int:id>', methods=['POST'])
+def api_delete_card(id):
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    card = scoped(Card).filter_by(id=id).first()
+    if not card:
+        return jsonify({'error': 'Card not found'}), 404
+    
+    if card.quantity > 1:
+        card.quantity -= 1
+        db.session.commit()
+        record_snapshot()
+        return jsonify({'success': True, 'action': 'decremented', 'quantity': card.quantity})
+    else:
+        DeckCard.query.filter_by(card_id=id).delete()
+        db.session.delete(card)
+        db.session.commit()
+        record_snapshot()
+        return jsonify({'success': True, 'action': 'deleted'})
+
 @app.route('/update_quantity/<int:id>/<action>')
 def update_quantity(id, action):
     card = scoped(Card).filter_by(id=id).first_or_404()
