@@ -1134,35 +1134,6 @@
             }
         }
 
-        function mapElementToVideoFrame(rect, video, videoWidth, videoHeight) {
-            const videoRect = video.getBoundingClientRect();
-            const eW = videoRect.width;
-            const eH = videoRect.height;
-            
-            const vW = videoWidth;
-            const vH = videoHeight;
-            
-            // s is scale factor for object-fit: cover
-            const s = Math.max(eW / vW, eH / vH);
-            const dx = (eW - s * vW) / 2;
-            const dy = (eH - s * vH) / 2;
-            
-            const x_elem = rect.left - videoRect.left;
-            const y_elem = rect.top - videoRect.top;
-            
-            const x_frame = (x_elem - dx) / s;
-            const y_frame = (y_elem - dy) / s;
-            const w_frame = rect.width / s;
-            const h_frame = rect.height / s;
-            
-            return {
-                x: Math.max(0, Math.min(vW, x_frame)),
-                y: Math.max(0, Math.min(vH, y_frame)),
-                w: Math.max(0, Math.min(vW - x_frame, w_frame)),
-                h: Math.max(0, Math.min(vH - y_frame, h_frame))
-            };
-        }
-
         function adjustScannerLayout() {
             const video = document.getElementById('scannerVideo');
             const guideBox = document.getElementById('scannerGuideBox');
@@ -1206,17 +1177,25 @@
             const videoHeight = video.videoHeight;
             if (!videoWidth || !videoHeight) return null;
             
-            const containerRect = video.getBoundingClientRect();
+            const videoRect = video.getBoundingClientRect();
             const guideRect = guideBox.getBoundingClientRect();
             
-            const frameCoords = mapElementToVideoFrame(guideRect, video, videoWidth, videoHeight);
+            let relativeLeft = (guideRect.left - videoRect.left) / videoRect.width;
+            let relativeTop = (guideRect.top - videoRect.top) / videoRect.height;
+            let relativeWidth = guideRect.width / videoRect.width;
+            let relativeHeight = guideRect.height / videoRect.height;
             
-            const sx = frameCoords.x;
-            const sy = frameCoords.y;
-            const sw = frameCoords.w;
-            const sh = frameCoords.h;
+            relativeLeft = Math.max(0, Math.min(1, relativeLeft));
+            relativeTop = Math.max(0, Math.min(1, relativeTop));
+            relativeWidth = Math.max(0, Math.min(1, relativeWidth));
+            relativeHeight = Math.max(0, Math.min(1, relativeHeight));
             
-            // Align crops exactly to dashed visual boundaries
+            const sx = videoWidth * relativeLeft;
+            const sy = videoHeight * relativeTop;
+            const sw = videoWidth * relativeWidth;
+            const sh = videoHeight * relativeHeight;
+            
+            // Align crops exactly to dashed visual boundaries (padding: 0 in guide box)
             const titleX = sx;
             const titleY = sy;
             const titleW = sw;
@@ -1293,15 +1272,9 @@
             
             const fullCanvas = document.getElementById('scannerFullCanvas');
             if (fullCanvas) {
-                // Crop calibration preview to show only the visible viewport frame
-                const visibleCoords = mapElementToVideoFrame(containerRect, video, videoWidth, videoHeight);
-                fullCanvas.width = visibleCoords.w;
-                fullCanvas.height = visibleCoords.h;
-                fullCanvas.getContext('2d').drawImage(
-                    video, 
-                    visibleCoords.x, visibleCoords.y, visibleCoords.w, visibleCoords.h,
-                    0, 0, visibleCoords.w, visibleCoords.h
-                );
+                fullCanvas.width = videoWidth;
+                fullCanvas.height = videoHeight;
+                fullCanvas.getContext('2d').drawImage(video, 0, 0, videoWidth, videoHeight);
                 
                 const fullPreviewImg = document.getElementById('scannerFullPreview');
                 if (fullPreviewImg) {
@@ -1310,11 +1283,6 @@
                 
                 const cropHighlight = document.getElementById('scannerCropHighlight');
                 if (cropHighlight) {
-                    let relativeLeft = (guideRect.left - containerRect.left) / containerRect.width;
-                    let relativeTop = (guideRect.top - containerRect.top) / containerRect.height;
-                    let relativeWidth = guideRect.width / containerRect.width;
-                    let relativeHeight = guideRect.height / containerRect.height;
-                    
                     cropHighlight.style.left = (relativeLeft * 100) + '%';
                     cropHighlight.style.top = (relativeTop * 100) + '%';
                     cropHighlight.style.width = (relativeWidth * 100) + '%';
@@ -1806,6 +1774,9 @@
                 .then(stream => {
                     mediaStream = stream;
                     video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        adjustScannerLayout();
+                    };
                     updateCameraList();
                     applyZoom(currentZoom);
                 })
@@ -2462,18 +2433,20 @@
             </div>
 
             <!-- Webcam Feed Viewport -->
-            <div id="videoContainer" style="position: relative; width: 100%; max-width: 280px; aspect-ratio: 2.5/3.5; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); margin: 0 auto; flex-shrink: 0;">
-                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-                <!-- ManaBOX-like Vertical Guide Box -->
-                <div id="scannerGuideBox" class="scanner-guide-box">
-                    <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
-                    
-                    <!-- Guide indicators -->
-                    <div style="width: 100%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(168, 85, 247, 0.15);">
-                        <span style="font-size: 0.58rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Card Title Zone</span>
-                    </div>
-                    <div style="width: 52%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(6, 182, 212, 0.15); align-self: flex-start; margin-top: auto;">
-                        <span style="font-size: 0.52rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Set Info</span>
+            <div id="videoContainer" style="position: relative; width: 100%; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 auto; max-height: 40vh;">
+                <div id="videoWrapper" style="position: relative; display: flex; justify-content: center; align-items: center; max-width: 100%; max-height: 100%;">
+                    <video id="scannerVideo" autoplay playsinline style="display: block; max-width: 100%; max-height: 40vh; width: auto; height: auto;"></video>
+                    <!-- ManaBOX-like Vertical Guide Box -->
+                    <div id="scannerGuideBox" class="scanner-guide-box">
+                        <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
+                        
+                        <!-- Guide indicators -->
+                        <div style="width: 100%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(168, 85, 247, 0.15);">
+                            <span style="font-size: 0.58rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Card Title Zone</span>
+                        </div>
+                        <div style="width: 52%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(6, 182, 212, 0.15); align-self: flex-start; margin-top: auto;">
+                            <span style="font-size: 0.52rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Set Info</span>
+                        </div>
                     </div>
                 </div>
                 <!-- Auto-Scan Status Bar Overlay -->
