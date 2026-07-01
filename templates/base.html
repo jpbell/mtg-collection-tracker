@@ -2266,7 +2266,7 @@
             display: none;
             overflow: hidden;
         }
-        #scannerFullscreenModal.active { display: block; }
+        #scannerFullscreenModal.active { display: flex; }
 
         #scannerFSVideo {
             position: absolute;
@@ -2822,12 +2822,17 @@
             navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
                 fsStream = stream;
                 elVideo.srcObject = stream;
-                elVideo.play().catch(function(){});
-                elVideo.onloadedmetadata = function() {
+                // play() must be called after a tick so the element is in the render tree
+                // and still within a user-gesture context window
+                setTimeout(function() {
+                    elVideo.play().catch(function(e){ console.warn('play() failed:', e); });
+                }, 0);
+                elVideo.oncanplay = function() {
                     elVideo.play().catch(function(){});
                     positionReticle();
                     applyZoom();
                     if (fsAutoScan) scheduleAutoScan();
+                    elVideo.oncanplay = null; // fire once
                 };
                 populateCameraList();
             }).catch(function(err) {
