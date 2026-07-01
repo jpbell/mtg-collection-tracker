@@ -2817,7 +2817,9 @@
             navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
                 fsStream = stream;
                 elVideo.srcObject = stream;
+                elVideo.play().catch(function(){});
                 elVideo.onloadedmetadata = function() {
+                    elVideo.play().catch(function(){});
                     positionReticle();
                     applyZoom();
                     if (fsAutoScan) scheduleAutoScan();
@@ -2870,14 +2872,23 @@
         }
 
         function toggleTorch() {
-            if (!fsStream) return;
+            if (!fsStream) { setStatus('Start camera first', 'error'); return; }
             var track = fsStream.getVideoTracks()[0];
-            var caps = track.getCapabilities ? track.getCapabilities() : {};
-            if (!caps.torch) { alert('Torch not supported on this camera.'); return; }
+            if (!track) return;
             fsTorchOn = !fsTorchOn;
-            track.applyConstraints({ advanced: [{ torch: fsTorchOn }] }).then(function() {
-                elTorchBtn.classList.toggle('active', fsTorchOn);
-            });
+            // Skip getCapabilities() — it's unreliable across browsers.
+            // Just attempt the constraint and fall back gracefully.
+            track.applyConstraints({ advanced: [{ torch: fsTorchOn }] })
+                .then(function() {
+                    elTorchBtn.classList.toggle('active', fsTorchOn);
+                })
+                .catch(function(err) {
+                    fsTorchOn = !fsTorchOn; // revert
+                    console.warn('Torch not supported:', err);
+                    elTorchBtn.title = 'Torch not supported on this camera';
+                    elTorchBtn.style.opacity = '0.4';
+                    setTimeout(function(){ elTorchBtn.style.opacity = ''; }, 1500);
+                });
         }
 
         // ---- Reticle ----
