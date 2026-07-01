@@ -2259,18 +2259,23 @@
 
         /* ---- Fullscreen Scanner ---- */
         #scannerFullscreenModal {
-            position: fixed; inset: 0; z-index: 99999;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 99999;
             background: #000;
-            display: none; flex-direction: column;
-            align-items: center; justify-content: center;
+            display: none;
             overflow: hidden;
         }
-        #scannerFullscreenModal.active { display: flex; }
+        #scannerFullscreenModal.active { display: block; }
 
         #scannerFSVideo {
-            position: absolute; inset: 0;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%;
             object-fit: cover;
+            object-position: center center;
+            transition: none !important;
+            transform-origin: 50% 50%;
         }
         #scannerFSVignette {
             position: absolute; inset: 0;
@@ -2858,16 +2863,20 @@
             if (!fsStream) return;
             var track = fsStream.getVideoTracks()[0];
             if (!track) return;
+            // Reset any CSS transform first
+            elVideo.style.transform = '';
+            elVideo.style.transformOrigin = '';
+            if (fsZoom === 1.0) return; // no transform needed at default zoom
             var caps = track.getCapabilities ? track.getCapabilities() : {};
             if (caps.zoom) {
                 var z = Math.max(caps.zoom.min, Math.min(caps.zoom.max, fsZoom));
                 track.applyConstraints({ advanced: [{ zoom: z }] }).catch(function() {
+                    elVideo.style.transformOrigin = '50% 50%';
                     elVideo.style.transform = 'scale(' + fsZoom + ')';
-                    elVideo.style.transformOrigin = 'center';
                 });
             } else {
+                elVideo.style.transformOrigin = '50% 50%';
                 elVideo.style.transform = 'scale(' + fsZoom + ')';
-                elVideo.style.transformOrigin = 'center';
             }
         }
 
