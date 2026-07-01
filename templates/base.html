@@ -1136,26 +1136,22 @@
 
         function adjustScannerLayout() {
             const video = document.getElementById('scannerVideo');
-            const container = video ? video.parentElement : null;
             const guideBox = document.getElementById('scannerGuideBox');
-            if (!video || !container || !guideBox) return;
+            if (!video || !guideBox) return;
             
             const vW = video.videoWidth;
             const vH = video.videoHeight;
             if (!vW || !vH) return;
             
-            // Set container aspect ratio to match stream exactly
-            container.style.aspectRatio = `${vW}/${vH}`;
-            
             const ratio = vW / vH;
             if (ratio < 1) {
                 // Portrait stream (e.g. mobile)
-                guideBox.style.width = '75%';
+                guideBox.style.width = '70%';
                 guideBox.style.height = '';
                 guideBox.style.aspectRatio = '2.5/3.5';
             } else {
                 // Landscape stream (e.g. desktop)
-                guideBox.style.height = '85%';
+                guideBox.style.height = '80%';
                 guideBox.style.width = '';
                 guideBox.style.aspectRatio = '2.5/3.5';
             }
@@ -1194,14 +1190,16 @@
             const sw = videoWidth * relativeWidth;
             const sh = videoHeight * relativeHeight;
             
-            const titleX = sx + sw * 0.04;
-            const titleY = sy + sh * 0.01;
-            const titleW = sw * 0.92;
+            // Shift crop slightly left (sx + sw * 0.02) and up (sy)
+            const titleX = sx + sw * 0.02;
+            const titleY = sy;
+            const titleW = sw * 0.96;
             const titleH = sh * 0.12;
             
-            const setX = sx + sw * 0.04;
-            const setY = sy + sh * 0.81;
-            const setW = sw * 0.52;
+            // Shift crop slightly left (sx + sw * 0.02) and up (sy + sh * 0.79)
+            const setX = sx + sw * 0.02;
+            const setY = sy + sh * 0.79;
+            const setW = sw * 0.54;
             const setH = sh * 0.12;
             
             const targetW = sw * 2;
@@ -2424,18 +2422,20 @@
             </div>
 
             <!-- Webcam Feed Viewport -->
-            <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill;"></video>
-                <!-- ManaBOX-like Vertical Guide Box -->
-                <div id="scannerGuideBox" class="scanner-guide-box">
-                    <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
-                    
-                    <!-- Guide indicators -->
-                    <div style="width: 100%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(168, 85, 247, 0.15);">
-                        <span style="font-size: 0.58rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Card Title Zone</span>
-                    </div>
-                    <div style="width: 52%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(6, 182, 212, 0.15); align-self: flex-start; margin-top: auto;">
-                        <span style="font-size: 0.52rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Set Info</span>
+            <div id="videoContainer" style="position: relative; width: 100%; height: 320px; max-height: 40vh; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 auto;">
+                <div id="videoWrapper" style="position: relative; display: inline-block; max-width: 100%; max-height: 100%; overflow: hidden;">
+                    <video id="scannerVideo" autoplay playsinline style="display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain;"></video>
+                    <!-- ManaBOX-like Vertical Guide Box -->
+                    <div id="scannerGuideBox" class="scanner-guide-box">
+                        <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
+                        
+                        <!-- Guide indicators -->
+                        <div style="width: 100%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(168, 85, 247, 0.15);">
+                            <span style="font-size: 0.58rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Card Title Zone</span>
+                        </div>
+                        <div style="width: 52%; border: 1px dashed rgba(255,255,255,0.35); border-radius: 4px; height: 12%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(6, 182, 212, 0.15); align-self: flex-start; margin-top: auto;">
+                            <span style="font-size: 0.52rem; color: #fff; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">Set Info</span>
+                        </div>
                     </div>
                 </div>
                 <!-- Auto-Scan Status Bar Overlay -->
