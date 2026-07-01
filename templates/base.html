@@ -1134,6 +1134,34 @@
             }
         }
 
+        function mapElementToVideoFrame(rect, video, videoWidth, videoHeight) {
+            const videoRect = video.getBoundingClientRect();
+            const eW = videoRect.width;
+            const eH = videoRect.height;
+            
+            const vW = videoWidth;
+            const vH = videoHeight;
+            
+            const s = Math.max(eW / vW, eH / vH);
+            const dx = (eW - s * vW) / 2;
+            const dy = (eH - s * vH) / 2;
+            
+            const x_elem = rect.left - videoRect.left;
+            const y_elem = rect.top - videoRect.top;
+            
+            const x_frame = (x_elem - dx) / s;
+            const y_frame = (y_elem - dy) / s;
+            const w_frame = rect.width / s;
+            const h_frame = rect.height / s;
+            
+            return {
+                x: Math.max(0, Math.min(vW, x_frame)),
+                y: Math.max(0, Math.min(vH, y_frame)),
+                w: Math.max(0, Math.min(vW - x_frame, w_frame)),
+                h: Math.max(0, Math.min(vH - y_frame, h_frame))
+            };
+        }
+
         function getProcessedScannerCanvas() {
             const video = document.getElementById('scannerVideo');
             const guideBox = document.getElementById('scannerGuideBox');
@@ -1146,23 +1174,13 @@
             const videoHeight = video.videoHeight;
             if (!videoWidth || !videoHeight) return null;
             
-            const videoRect = video.getBoundingClientRect();
             const guideRect = guideBox.getBoundingClientRect();
+            const frameCoords = mapElementToVideoFrame(guideRect, video, videoWidth, videoHeight);
             
-            let relativeLeft = (guideRect.left - videoRect.left) / videoRect.width;
-            let relativeTop = (guideRect.top - videoRect.top) / videoRect.height;
-            let relativeWidth = guideRect.width / videoRect.width;
-            let relativeHeight = guideRect.height / videoRect.height;
-            
-            relativeLeft = Math.max(0, Math.min(1, relativeLeft));
-            relativeTop = Math.max(0, Math.min(1, relativeTop));
-            relativeWidth = Math.max(0, Math.min(1, relativeWidth));
-            relativeHeight = Math.max(0, Math.min(1, relativeHeight));
-            
-            const sx = videoWidth * relativeLeft;
-            const sy = videoHeight * relativeTop;
-            const sw = videoWidth * relativeWidth;
-            const sh = videoHeight * relativeHeight;
+            const sx = frameCoords.x;
+            const sy = frameCoords.y;
+            const sw = frameCoords.w;
+            const sh = frameCoords.h;
             
             const titleX = sx + sw * 0.04;
             const titleY = sy + sh * 0.01;
@@ -1250,10 +1268,10 @@
                 
                 const cropHighlight = document.getElementById('scannerCropHighlight');
                 if (cropHighlight) {
-                    cropHighlight.style.top = (relativeTop * 100) + '%';
-                    cropHighlight.style.left = (relativeLeft * 100) + '%';
-                    cropHighlight.style.width = (relativeWidth * 100) + '%';
-                    cropHighlight.style.height = (relativeHeight * 100) + '%';
+                    cropHighlight.style.left = (sx / videoWidth * 100) + '%';
+                    cropHighlight.style.top = (sy / videoHeight * 100) + '%';
+                    cropHighlight.style.width = (sw / videoWidth * 100) + '%';
+                    cropHighlight.style.height = (sh / videoHeight * 100) + '%';
                 }
             }
             
@@ -2305,10 +2323,10 @@
         }
         .scanner-guide-box {
             position: absolute;
-            top: 5%;
-            bottom: 5%;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
+            width: 80%;
             aspect-ratio: 2.5/3.5;
             border: 3px dashed var(--accent-purple);
             border-radius: 12px;
@@ -2393,8 +2411,8 @@
             </div>
 
             <!-- Webcam Feed Viewport -->
-            <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill;"></video>
+            <div style="position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
+                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
                 <!-- ManaBOX-like Vertical Guide Box -->
                 <div id="scannerGuideBox" class="scanner-guide-box">
                     <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
