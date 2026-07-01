@@ -1134,33 +1134,35 @@
             }
         }
 
-        function mapElementToVideoFrame(rect, video, videoWidth, videoHeight) {
-            const videoRect = video.getBoundingClientRect();
-            const eW = videoRect.width;
-            const eH = videoRect.height;
+        function adjustScannerLayout() {
+            const video = document.getElementById('scannerVideo');
+            const container = video ? video.parentElement : null;
+            const guideBox = document.getElementById('scannerGuideBox');
+            if (!video || !container || !guideBox) return;
             
-            const vW = videoWidth;
-            const vH = videoHeight;
+            const vW = video.videoWidth;
+            const vH = video.videoHeight;
+            if (!vW || !vH) return;
             
-            const s = Math.max(eW / vW, eH / vH);
-            const dx = (eW - s * vW) / 2;
-            const dy = (eH - s * vH) / 2;
+            // Set container aspect ratio to match stream exactly
+            container.style.aspectRatio = `${vW}/${vH}`;
             
-            const x_elem = rect.left - videoRect.left;
-            const y_elem = rect.top - videoRect.top;
-            
-            const x_frame = (x_elem - dx) / s;
-            const y_frame = (y_elem - dy) / s;
-            const w_frame = rect.width / s;
-            const h_frame = rect.height / s;
-            
-            return {
-                x: Math.max(0, Math.min(vW, x_frame)),
-                y: Math.max(0, Math.min(vH, y_frame)),
-                w: Math.max(0, Math.min(vW - x_frame, w_frame)),
-                h: Math.max(0, Math.min(vH - y_frame, h_frame))
-            };
+            const ratio = vW / vH;
+            if (ratio < 1) {
+                // Portrait stream (e.g. mobile)
+                guideBox.style.width = '75%';
+                guideBox.style.height = '';
+                guideBox.style.aspectRatio = '2.5/3.5';
+            } else {
+                // Landscape stream (e.g. desktop)
+                guideBox.style.height = '85%';
+                guideBox.style.width = '';
+                guideBox.style.aspectRatio = '2.5/3.5';
+            }
         }
+
+        // Add resize listener
+        window.addEventListener('resize', adjustScannerLayout);
 
         function getProcessedScannerCanvas() {
             const video = document.getElementById('scannerVideo');
@@ -1174,13 +1176,23 @@
             const videoHeight = video.videoHeight;
             if (!videoWidth || !videoHeight) return null;
             
+            const videoRect = video.getBoundingClientRect();
             const guideRect = guideBox.getBoundingClientRect();
-            const frameCoords = mapElementToVideoFrame(guideRect, video, videoWidth, videoHeight);
             
-            const sx = frameCoords.x;
-            const sy = frameCoords.y;
-            const sw = frameCoords.w;
-            const sh = frameCoords.h;
+            let relativeLeft = (guideRect.left - videoRect.left) / videoRect.width;
+            let relativeTop = (guideRect.top - videoRect.top) / videoRect.height;
+            let relativeWidth = guideRect.width / videoRect.width;
+            let relativeHeight = guideRect.height / videoRect.height;
+            
+            relativeLeft = Math.max(0, Math.min(1, relativeLeft));
+            relativeTop = Math.max(0, Math.min(1, relativeTop));
+            relativeWidth = Math.max(0, Math.min(1, relativeWidth));
+            relativeHeight = Math.max(0, Math.min(1, relativeHeight));
+            
+            const sx = videoWidth * relativeLeft;
+            const sy = videoHeight * relativeTop;
+            const sw = videoWidth * relativeWidth;
+            const sh = videoHeight * relativeHeight;
             
             const titleX = sx + sw * 0.04;
             const titleY = sy + sh * 0.01;
@@ -1759,6 +1771,9 @@
                 .then(stream => {
                     mediaStream = stream;
                     video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        adjustScannerLayout();
+                    };
                     updateCameraList();
                     applyZoom(currentZoom);
                 })
@@ -2326,8 +2341,6 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80%;
-            aspect-ratio: 2.5/3.5;
             border: 3px dashed var(--accent-purple);
             border-radius: 12px;
             pointer-events: none;
@@ -2411,8 +2424,8 @@
             </div>
 
             <!-- Webcam Feed Viewport -->
-            <div style="position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+            <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
+                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill;"></video>
                 <!-- ManaBOX-like Vertical Guide Box -->
                 <div id="scannerGuideBox" class="scanner-guide-box">
                     <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
@@ -2498,8 +2511,8 @@
                     <div id="calibrationContent" style="display: none; padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-direction: column; gap: 12px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Captured Card Preview</div>
-                            <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
-                                <img id="scannerFullPreview" style="width: 100%; height: 100%; object-fit: fill;" alt="Full Captured View">
+                            <div style="position: relative; width: 100%; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
+                                <img id="scannerFullPreview" style="width: 100%; height: auto; display: block;" alt="Full Captured View">
                                 <div id="scannerCropHighlight" style="position: absolute; border: 2px dashed var(--accent-purple); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); pointer-events: none; border-radius: 4px; box-sizing: border-box;"></div>
                             </div>
                         </div>
