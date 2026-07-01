@@ -2667,7 +2667,8 @@
         'use strict';
 
         var fsStream = null, fsAutoScan = false, fsAutoTimer = null,
-            fsIsOCRRunning = false, fsLastKey = '', fsCurrentPrintings = [],
+            fsIsOCRRunning = false, fsIsLookingUp = false,
+            fsLastKey = '', fsCurrentPrintings = [],
             fsCurrentPrinting = null, fsIsFoil = false, fsZoom = 1.0,
             fsTorchOn = false, fsSessionQueue = [], fsScanCount = 0,
             fsHistoryOpen = false;
@@ -2965,10 +2966,9 @@
         function scheduleAutoScan() {
             clearTimeout(fsAutoTimer);
             if (!fsAutoScan) return;
-            // Don't schedule while result panel is open — wait for user to dismiss/add
-            if (elResultPanel && elResultPanel.classList.contains('visible')) return;
+            // Keep the loop ticking every 2.4s — runScan checks inside whether to actually fire
             fsAutoTimer = setTimeout(function() {
-                if (!fsIsOCRRunning && fsAutoScan &&
+                if (!fsIsOCRRunning && !fsIsLookingUp && fsAutoScan &&
                     !(elResultPanel && elResultPanel.classList.contains('visible'))) {
                     runScan(true);
                 }
@@ -2990,10 +2990,13 @@
         }
 
         // ---- Capture ----
-        function captureAndScan() { stopAutoScan(); runScan(false); }
+        function captureAndScan() {
+            stopAutoScan(); // stop the timer before manual capture
+            runScan(false);
+        }
 
         function runScan(isAuto) {
-            if (fsIsOCRRunning) return;
+            if (fsIsOCRRunning || fsIsLookingUp) return;
             if (!elVideo.videoWidth || !elVideo.videoHeight) return;
             var dataUrl = captureReticleFrame();
             if (!dataUrl) return;
@@ -3010,12 +3013,12 @@
                 if (!name) {
                     setStatus('Adjust angle or lighting and retry', 'error');
                     if (isAuto) elAutoStatus.textContent = '⚠️ Could not read card';
-                    if (fsAutoScan) scheduleAutoScan();
+                    if (!isAuto && fsAutoScan) scheduleAutoScan(); // restart loop after manual
                     return;
                 }
                 if (isAuto && name.toLowerCase() === fsLastKey.toLowerCase()) {
                     setStatus('Card in frame: ' + name, 'matched');
-                    if (fsAutoScan) scheduleAutoScan();
+                    // Loop will continue via scheduleAutoScan() in the timeout callback
                     return;
                 }
                 fsLastKey = name;
@@ -3026,7 +3029,7 @@
                 fsIsOCRRunning = false;
                 console.error('OCR error:', err);
                 setStatus('OCR failed — try again', 'error');
-                if (fsAutoScan) scheduleAutoScan();
+                if (!isAuto && fsAutoScan) scheduleAutoScan();
             });
         }
 
@@ -3074,6 +3077,7 @@
 
         // ---- Scryfall ----
         function lookupScryfall(name, isAuto) {
+            fsIsLookingUp = true;
             setStatus('Looking up on Scryfall...', 'scanning');
             fetch('https://api.scryfall.com/cards/named?fuzzy=' + encodeURIComponent(name))
                 .then(function(r) {
@@ -3082,6 +3086,7 @@
                         .then(function(r2){ return r2.ok ? r2.json().then(function(d){ return d.data||[]; }) : []; });
                 })
                 .then(function(cards) {
+                    fsIsLookingUp = false;
                     if (!cards || !cards.length) throw new Error('No match');
                     fsCurrentPrintings = cards;
                     fsCurrentPrinting  = cards[0];
@@ -3090,17 +3095,19 @@
                     setStatus('Card found!', 'matched');
                     playBeep(660, 0.1);
                     if (isAuto) {
-                        elAutoStatus.textContent = '🎉 Detected: ' + fsCurrentPrinting.name + ' — tap Add or Dismiss';
-                        // Show the panel for confirmation; auto-scan pauses until dismissed
+                        elAutoStatus.textContent = '🎉 ' + fsCurrentPrinting.name + ' detected — Add or Dismiss';
+                        // Panel is now visible; scheduleAutoScan loop will skip runScan
+                        // until the user dismisses or adds the card
                     } else {
                         if (fsAutoScan) scheduleAutoScan();
                     }
                 })
                 .catch(function(err) {
+                    fsIsLookingUp = false;
                     console.warn('Scryfall lookup failed:', err);
                     setStatus('No match for "' + name + '"', 'error');
                     if (isAuto) elAutoStatus.textContent = '⚠️ No match for "' + name + '"';
-                    if (fsAutoScan) scheduleAutoScan();
+                    if (!isAuto && fsAutoScan) scheduleAutoScan();
                 });
         }
 
