@@ -2627,7 +2627,10 @@
 
         <!-- Slide-up result panel -->
         <div id="scannerResultPanel">
-            <div class="drag-handle"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <div class="drag-handle" style="margin:0;"></div>
+                <button id="scannerResultDismissBtn" title="Dismiss and scan next card" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);color:rgba(255,255,255,0.55);border-radius:8px;padding:4px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.3px;transition:background 0.15s,color 0.15s;">✕ Dismiss</button>
+            </div>
             <div id="scannerResultCard">
                 <img id="scannerResultImg" src="" alt="Card art">
                 <div id="scannerResultDetails">
@@ -2673,8 +2676,9 @@
             elCamSel, elTorchBtn, elAutoBtn, elShutter, elUploadInput,
             elHistoryBtn, elSessionBadge, elResultPanel, elResultImg,
             elResultName, elResultMeta, elResultPrice, elResultPrintSel,
-            elResultSummonBtn, elResultBtnText, elSessionDrawer,
-            elSessionList, elSessionTotal, elSearchInput, elSearchBtn,
+            elResultSummonBtn, elResultBtnText, elResultDismissBtn,
+            elSessionDrawer, elSessionList, elSessionTotal,
+            elSearchInput, elSearchBtn,
             elZoomSlider, elZoomVal, elFoilNormal, elFoilFoil,
             elConditionSel, elFSCanvas, elScanCanvas;
 
@@ -2697,9 +2701,10 @@
             elResultMeta     = document.getElementById('scannerResultMeta');
             elResultPrice    = document.getElementById('scannerResultPrice');
             elResultPrintSel = document.getElementById('scannerResultPrintingSelect');
-            elResultSummonBtn= document.getElementById('scannerResultSummonBtn');
-            elResultBtnText  = document.getElementById('scannerResultBtnText');
-            elSessionDrawer  = document.getElementById('scannerSessionDrawer');
+            elResultSummonBtn   = document.getElementById('scannerResultSummonBtn');
+            elResultBtnText     = document.getElementById('scannerResultBtnText');
+            elResultDismissBtn  = document.getElementById('scannerResultDismissBtn');
+            elSessionDrawer     = document.getElementById('scannerSessionDrawer');
             elSessionList    = document.getElementById('scannerSessionList');
             elSessionTotal   = document.getElementById('scannerSessionTotal');
             elSearchInput    = document.getElementById('scannerFSSearchInput');
@@ -2754,6 +2759,16 @@
                 }
             });
             elResultSummonBtn.addEventListener('click', function() { summonCard(false); });
+            elResultDismissBtn.addEventListener('click', dismissResultPanel);
+            // Hover style for dismiss button
+            elResultDismissBtn.addEventListener('mouseenter', function(){
+                elResultDismissBtn.style.background = 'rgba(255,255,255,0.14)';
+                elResultDismissBtn.style.color = '#fff';
+            });
+            elResultDismissBtn.addEventListener('mouseleave', function(){
+                elResultDismissBtn.style.background = 'rgba(255,255,255,0.07)';
+                elResultDismissBtn.style.color = 'rgba(255,255,255,0.55)';
+            });
 
             function doSearch() {
                 var q = elSearchInput.value.trim();
@@ -2950,13 +2965,29 @@
         function scheduleAutoScan() {
             clearTimeout(fsAutoTimer);
             if (!fsAutoScan) return;
+            // Don't schedule while result panel is open — wait for user to dismiss/add
+            if (elResultPanel && elResultPanel.classList.contains('visible')) return;
             fsAutoTimer = setTimeout(function() {
-                if (!fsIsOCRRunning && fsAutoScan) runScan(true);
+                if (!fsIsOCRRunning && fsAutoScan &&
+                    !(elResultPanel && elResultPanel.classList.contains('visible'))) {
+                    runScan(true);
+                }
                 scheduleAutoScan();
             }, 2400);
         }
 
         function stopAutoScan() { clearTimeout(fsAutoTimer); }
+
+        // ---- Dismiss result panel ----
+        function dismissResultPanel() {
+            elResultPanel.classList.remove('visible');
+            fsCurrentPrinting = null;
+            fsCurrentPrintings = [];
+            fsLastKey = ''; // clear so the same card triggers again if placed back
+            setStatus('Align card inside the frame', '');
+            elAutoStatus.textContent = fsAutoScan ? '🤖 Auto-scan active' : '';
+            if (fsAutoScan) scheduleAutoScan();
+        }
 
         // ---- Capture ----
         function captureAndScan() { stopAutoScan(); runScan(false); }
@@ -3058,11 +3089,12 @@
                     elResultPanel.classList.add('visible');
                     setStatus('Card found!', 'matched');
                     playBeep(660, 0.1);
-                    if (isAuto && fsAutoScan) {
-                        elAutoStatus.textContent = '🎉 Found: ' + fsCurrentPrinting.name;
-                        summonCard(true);
+                    if (isAuto) {
+                        elAutoStatus.textContent = '🎉 Detected: ' + fsCurrentPrinting.name + ' — tap Add or Dismiss';
+                        // Show the panel for confirmation; auto-scan pauses until dismissed
+                    } else {
+                        if (fsAutoScan) scheduleAutoScan();
                     }
-                    if (fsAutoScan) scheduleAutoScan();
                 })
                 .catch(function(err) {
                     console.warn('Scryfall lookup failed:', err);
@@ -3139,6 +3171,8 @@
                         price: added.price, image_url: added.image_url
                     });
                     renderSessionList();
+                    // After a brief success moment, auto-dismiss so scanner is ready for next card
+                    setTimeout(function() { dismissResultPanel(); }, 1500);
                 })
                 .catch(function(err) {
                     console.error(err);
