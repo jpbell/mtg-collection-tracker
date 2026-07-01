@@ -1142,8 +1142,8 @@
             const vW = videoWidth;
             const vH = videoHeight;
             
-            // Math.min for object-fit: contain
-            const s = Math.min(eW / vW, eH / vH);
+            // s is scale factor for object-fit: cover
+            const s = Math.max(eW / vW, eH / vH);
             const dx = (eW - s * vW) / 2;
             const dy = (eH - s * vH) / 2;
             
@@ -1172,20 +1172,22 @@
             const dH = video.clientHeight;
             if (!dW || !dH) return;
             
-            const ratio = dW / dH;
-            if (ratio < 1) {
-                // Portrait stream (e.g. mobile)
-                const guideW = dW * 0.70;
-                const guideH = guideW * 1.4;
-                guideBox.style.width = `${guideW}px`;
-                guideBox.style.height = `${guideH}px`;
+            // Cards are typically 2.5" x 3.5" (ratio ~0.714)
+            const ratio = 0.714;
+            const maxWidth = dW * 0.85;
+            const maxHeight = dH * 0.85;
+            
+            let guideW, guideH;
+            if (maxWidth * ratio <= maxHeight) {
+                guideW = maxWidth;
+                guideH = guideW / ratio;
             } else {
-                // Landscape stream (e.g. desktop)
-                const guideH = dH * 0.80;
-                const guideW = guideH / 1.4;
-                guideBox.style.width = `${guideW}px`;
-                guideBox.style.height = `${guideH}px`;
+                guideH = maxHeight;
+                guideW = guideH * ratio;
             }
+            
+            guideBox.style.width = `${guideW}px`;
+            guideBox.style.height = `${guideH}px`;
         }
 
         // Add resize listener
@@ -1204,7 +1206,9 @@
             const videoHeight = video.videoHeight;
             if (!videoWidth || !videoHeight) return null;
             
+            const containerRect = video.getBoundingClientRect();
             const guideRect = guideBox.getBoundingClientRect();
+            
             const frameCoords = mapElementToVideoFrame(guideRect, video, videoWidth, videoHeight);
             
             const sx = frameCoords.x;
@@ -1212,16 +1216,15 @@
             const sw = frameCoords.w;
             const sh = frameCoords.h;
             
-            // Shift crop slightly left (sx + sw * 0.02) and up (sy)
-            const titleX = sx + sw * 0.02;
+            // Align crops exactly to dashed visual boundaries
+            const titleX = sx;
             const titleY = sy;
-            const titleW = sw * 0.96;
+            const titleW = sw;
             const titleH = sh * 0.12;
             
-            // Shift crop slightly left (sx + sw * 0.02) and up (sy + sh * 0.79)
-            const setX = sx + sw * 0.02;
-            const setY = sy + sh * 0.79;
-            const setW = sw * 0.54;
+            const setX = sx;
+            const setY = sy + sh * 0.88;
+            const setW = sw * 0.52;
             const setH = sh * 0.12;
             
             const targetW = sw * 2;
@@ -1290,9 +1293,16 @@
             
             const fullCanvas = document.getElementById('scannerFullCanvas');
             if (fullCanvas) {
-                fullCanvas.width = videoWidth;
-                fullCanvas.height = videoHeight;
-                fullCanvas.getContext('2d').drawImage(video, 0, 0, videoWidth, videoHeight);
+                // Crop calibration preview to show only the visible viewport frame
+                const visibleCoords = mapElementToVideoFrame(containerRect, video, videoWidth, videoHeight);
+                fullCanvas.width = visibleCoords.w;
+                fullCanvas.height = visibleCoords.h;
+                fullCanvas.getContext('2d').drawImage(
+                    video, 
+                    visibleCoords.x, visibleCoords.y, visibleCoords.w, visibleCoords.h,
+                    0, 0, visibleCoords.w, visibleCoords.h
+                );
+                
                 const fullPreviewImg = document.getElementById('scannerFullPreview');
                 if (fullPreviewImg) {
                     fullPreviewImg.src = fullCanvas.toDataURL('image/png');
@@ -1300,10 +1310,15 @@
                 
                 const cropHighlight = document.getElementById('scannerCropHighlight');
                 if (cropHighlight) {
-                    cropHighlight.style.left = (sx / videoWidth * 100) + '%';
-                    cropHighlight.style.top = (sy / videoHeight * 100) + '%';
-                    cropHighlight.style.width = (sw / videoWidth * 100) + '%';
-                    cropHighlight.style.height = (sh / videoHeight * 100) + '%';
+                    let relativeLeft = (guideRect.left - containerRect.left) / containerRect.width;
+                    let relativeTop = (guideRect.top - containerRect.top) / containerRect.height;
+                    let relativeWidth = guideRect.width / containerRect.width;
+                    let relativeHeight = guideRect.height / containerRect.height;
+                    
+                    cropHighlight.style.left = (relativeLeft * 100) + '%';
+                    cropHighlight.style.top = (relativeTop * 100) + '%';
+                    cropHighlight.style.width = (relativeWidth * 100) + '%';
+                    cropHighlight.style.height = (relativeHeight * 100) + '%';
                 }
             }
             
@@ -1791,9 +1806,6 @@
                 .then(stream => {
                     mediaStream = stream;
                     video.srcObject = stream;
-                    video.onloadedmetadata = () => {
-                        adjustScannerLayout();
-                    };
                     updateCameraList();
                     applyZoom(currentZoom);
                 })
@@ -2040,6 +2052,12 @@
             }
             
             setupManaBoxUIListeners();
+            
+            if (video) {
+                video.addEventListener('play', () => {
+                    setTimeout(adjustScannerLayout, 150);
+                });
+            }
             
             if (openScanner && scannerModal) {
                 openScanner.addEventListener('click', () => {
@@ -2362,13 +2380,13 @@
             left: 50%;
             transform: translate(-50%, -50%);
             border: 3px dashed var(--accent-purple);
-            border-radius: 12px;
+            border-radius: 8px;
             pointer-events: none;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.65);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 8px;
+            padding: 0;
             box-sizing: border-box;
             animation: borderPulse 2.5s infinite ease-in-out;
             transition: all 0.25s ease;
@@ -2444,8 +2462,8 @@
             </div>
 
             <!-- Webcam Feed Viewport -->
-            <div id="videoContainer" style="position: relative; width: 100%; height: 320px; max-height: 40vh; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 auto;">
-                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>
+            <div id="videoContainer" style="position: relative; width: 100%; max-width: 280px; aspect-ratio: 2.5/3.5; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); margin: 0 auto; flex-shrink: 0;">
+                <video id="scannerVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
                 <!-- ManaBOX-like Vertical Guide Box -->
                 <div id="scannerGuideBox" class="scanner-guide-box">
                     <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
