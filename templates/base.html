@@ -1997,77 +1997,13 @@
             }
         }
 
-        // Initialize scanner listeners
+        // Initialize scanner listeners — redirects to new fullscreen scanner
         document.addEventListener('DOMContentLoaded', () => {
-            const openScanner = document.getElementById('openScannerBtn');
-            const closeScanner = document.getElementById('closeScannerModalBtn');
-            const scannerModal = document.getElementById('cardScannerModal');
-            const captureBtn = document.getElementById('captureBtn');
-            const video = document.getElementById('scannerVideo');
-            const canvas = document.getElementById('scannerCanvas');
-            const camSelect = document.getElementById('cameraSelect');
-            const fileInput = document.getElementById('scannerFileInput');
-            const guideBox = document.getElementById('scannerGuideBox');
-            
-            let savedZoom = parseFloat(localStorage.getItem('scanner_zoom')) || 1.0;
-            let savedAutoScan = localStorage.getItem('scanner_autoScan') === 'true';
-            
-            currentZoom = savedZoom;
-            let autoScanEnabled = savedAutoScan;
-            let torchEnabled = false;
-            
-            const zoomSlider = document.getElementById('cameraZoomSlider');
-            if (zoomSlider) {
-                zoomSlider.value = savedZoom;
-            }
-            
-            setupManaBoxUIListeners();
-            
-            if (video) {
-                video.addEventListener('play', () => {
-                    setTimeout(adjustScannerLayout, 150);
-                });
-            }
-            
-            if (openScanner && scannerModal) {
-                openScanner.addEventListener('click', () => {
-                    window.scannerMadeAdditions = false;
-                    window.sessionSummonCount = 0;
-                    torchEnabled = false;
-                    
-                    sessionScanQueue = [];
-                    renderSessionQueue();
-                    const activeContainer = document.getElementById('activeMatchContainer');
-                    if (activeContainer) {
-                        activeContainer.style.display = 'none';
-                    }
-                    
-                    const badge = document.getElementById('sessionCounterBadge');
-                    if (badge) {
-                        badge.style.display = 'none';
-                        badge.textContent = '0 Summoned';
-                    }
-                    const torchBtnText = document.getElementById('torchBtnText');
-                    const torchBtn = document.getElementById('torchBtn');
-                    if (torchBtnText && torchBtn) {
-                        torchBtnText.textContent = 'Torch On';
-                        torchBtn.style.background = '';
-                    }
-                    
-                    applyZoom(currentZoom);
-                    updateAutoScanUI();
-                    
-                    scannerModal.style.display = 'flex';
-                    startCamera();
-                });
-            }
-            
-            if (closeScanner && scannerModal) {
-                closeScanner.addEventListener('click', () => {
-                    scannerModal.style.display = 'none';
-                    stopCamera();
-                    if (window.scannerMadeAdditions) {
-                        window.location.reload();
+            const openScannerButton = document.getElementById('openScannerBtn');
+            if (openScannerButton) {
+                openScannerButton.addEventListener('click', () => {
+                    if (typeof window.openCardScanner === 'function') {
+                        window.openCardScanner();
                     }
                 });
             }
@@ -2302,57 +2238,298 @@
         });
     </script>
 
-    <!-- Style Keyframes & Modals -->
+    <!-- ============================================================
+         FULLSCREEN SCANNER STYLES
+         ============================================================ -->
     <style>
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes scanSuccessFlash {
-            0% { border-color: var(--accent-purple); box-shadow: 0 0 15px var(--accent-purple); }
-            50% { border-color: var(--accent-green); box-shadow: 0 0 25px var(--accent-green); }
+            0%   { border-color: var(--accent-purple); box-shadow: 0 0 15px var(--accent-purple); }
+            50%  { border-color: var(--accent-green);  box-shadow: 0 0 25px var(--accent-green);  }
             100% { border-color: var(--accent-purple); box-shadow: 0 0 15px var(--accent-purple); }
         }
-        .scan-success-flash {
-            animation: scanSuccessFlash 0.8s ease-out;
-        }
+        .scan-success-flash { animation: scanSuccessFlash 0.8s ease-out; }
         .modal-overlay {
-            position: fixed;
-            z-index: 10000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(12, 10, 28, 0.85);
+            position: fixed; z-index: 10000; left: 0; top: 0;
+            width: 100%; height: 100%;
+            background: rgba(12,10,28,0.85);
             backdrop-filter: blur(8px);
             box-sizing: border-box;
         }
-        @keyframes scanLineMove {
-            0% { top: 3%; }
-            50% { top: 94%; }
-            100% { top: 3%; }
+
+        /* ---- Fullscreen Scanner ---- */
+        #scannerFullscreenModal {
+            position: fixed; inset: 0; z-index: 99999;
+            background: #000;
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            overflow: hidden;
         }
-        @keyframes borderPulse {
-            0% { border-color: rgba(168, 85, 247, 0.7); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2); }
-            50% { border-color: rgba(168, 85, 247, 1); box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
-            100% { border-color: rgba(168, 85, 247, 0.7); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2); }
+        #scannerFullscreenModal.active { display: flex; }
+
+        #scannerFSVideo {
+            position: absolute; inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
         }
-        .scanner-guide-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            border: 3px dashed var(--accent-purple);
-            border-radius: 8px;
+        #scannerFSVignette {
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse at center, transparent 28%, rgba(0,0,0,0.72) 100%);
+            pointer-events: none; z-index: 2;
+        }
+
+        /* Reticle */
+        #scannerReticle {
+            position: absolute; z-index: 3; pointer-events: none;
+        }
+        .reticle-corner {
+            position: absolute; width: 26px; height: 26px;
+            border-color: rgba(255,255,255,0.9); border-style: solid; border-width: 0;
+            transition: border-color 0.3s;
+        }
+        .reticle-corner.tl { top:0;left:0; border-top-width:3px; border-left-width:3px; border-top-left-radius:5px; }
+        .reticle-corner.tr { top:0;right:0; border-top-width:3px; border-right-width:3px; border-top-right-radius:5px; }
+        .reticle-corner.bl { bottom:0;left:0; border-bottom-width:3px; border-left-width:3px; border-bottom-left-radius:5px; }
+        .reticle-corner.br { bottom:0;right:0; border-bottom-width:3px; border-right-width:3px; border-bottom-right-radius:5px; }
+
+        #scannerReticle.state-scanning .reticle-corner { border-color: var(--accent-cyan); }
+        #scannerReticle.state-matched  .reticle-corner { border-color: var(--accent-green); }
+        #scannerReticle.state-error    .reticle-corner { border-color: var(--accent-rose); }
+
+        #scannerLaser {
+            position: absolute; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            box-shadow: 0 0 8px var(--accent-cyan);
+            animation: laserSweep 2.2s ease-in-out infinite;
             pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 0;
-            box-sizing: border-box;
-            animation: borderPulse 2.5s infinite ease-in-out;
-            transition: all 0.25s ease;
-            z-index: 2;
         }
+        @keyframes laserSweep {
+            0%   { top: 2%;  opacity: 0; }
+            8%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { top: 97%; opacity: 0; }
+        }
+
+        /* Status pill */
+        #scannerStatusPill {
+            position: absolute; z-index: 4;
+            background: rgba(0,0,0,0.68);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 99px;
+            padding: 6px 18px;
+            font-size: 0.8rem; font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.3px; white-space: nowrap;
+            transition: all 0.25s ease; pointer-events: none;
+        }
+
+        /* Top bar */
+        #scannerFSTopBar {
+            position: absolute; top:0; left:0; right:0; z-index: 5;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.72), transparent);
+        }
+        #scannerFSTopBar select {
+            background: rgba(0,0,0,0.5); color:#fff;
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 8px; padding: 6px 10px;
+            font-size: 0.8rem; outline: none; max-width: 170px;
+        }
+        .fs-icon-btn {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 10px; color:#fff;
+            width:42px; height:42px;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; font-size:1.1rem;
+            backdrop-filter: blur(4px);
+            transition: background 0.2s, box-shadow 0.2s;
+            flex-shrink:0; position:relative;
+        }
+        .fs-icon-btn:hover { background: rgba(255,255,255,0.15); box-shadow: none; transform:none; filter:none; }
+        .fs-icon-btn.active { background: var(--accent-purple); border-color: var(--accent-purple); box-shadow: 0 0 10px rgba(168,85,247,0.4); }
+
+        /* Bottom bar */
+        #scannerFSBottomBar {
+            position: absolute; bottom:0; left:0; right:0; z-index:5;
+            display: flex; flex-direction: column; align-items: stretch;
+            background: linear-gradient(to top, rgba(0,0,0,0.88) 60%, transparent);
+            padding-bottom: env(safe-area-inset-bottom, 12px);
+        }
+        #scannerFSAutoStatus {
+            text-align: center;
+            font-size: 0.78rem; font-weight: 700;
+            color: rgba(255,255,255,0.5);
+            padding: 5px 18px 0; min-height: 22px;
+        }
+        #scannerFSSearchRow {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 18px 4px;
+        }
+        #scannerFSSearchInput {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color:#fff; border-radius:99px;
+            padding: 8px 16px; font-size:0.85rem;
+            outline:none; font-family:inherit;
+        }
+        #scannerFSSearchInput::placeholder { color: rgba(255,255,255,0.32); }
+        #scannerFSSearchBtn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color:#fff; border-radius:99px;
+            padding: 8px 16px;
+            font-size:0.8rem; font-weight:700; cursor:pointer;
+        }
+        #scannerFSSearchBtn:hover { background: rgba(255,255,255,0.2); transform:none; filter:none; box-shadow:none; }
+
+        #scannerFSSettingsRow {
+            display: flex; align-items: center; justify-content: center;
+            gap: 12px; padding: 6px 18px 4px; flex-wrap: wrap;
+        }
+        .fs-pill-toggle {
+            display: flex; background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 99px; padding: 2px; gap: 2px;
+        }
+        .fs-pill-toggle button {
+            background: transparent; border:none;
+            color: rgba(255,255,255,0.45);
+            font-size:0.72rem; font-weight:700;
+            padding: 4px 14px; border-radius:99px;
+            cursor:pointer; letter-spacing:0.3px;
+            transition: all 0.15s;
+        }
+        .fs-pill-toggle button.active {
+            background: var(--accent-purple); color:#fff;
+            transform:none; box-shadow:none; filter:none;
+        }
+        .fs-condition-select {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.8);
+            border-radius:99px; padding: 5px 12px;
+            font-size:0.72rem; font-weight:600; outline:none;
+        }
+        .fs-zoom-row {
+            display:flex; align-items:center; gap:7px;
+            color: rgba(255,255,255,0.45);
+            font-size:0.72rem; font-weight:600;
+        }
+        .fs-zoom-row input[type=range] {
+            width:80px; accent-color: var(--accent-purple);
+            height:3px; padding:0; background:none; border:none;
+        }
+
+        #scannerFSActionsRow {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            padding: 8px 24px 18px; gap: 16px;
+        }
+        #scannerShutterBtn {
+            width:72px; height:72px; border-radius:50%;
+            background:#fff;
+            border: 4px solid rgba(255,255,255,0.28);
+            cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+            flex-shrink:0;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.55);
+            transition: transform 0.1s;
+        }
+        #scannerShutterBtn:hover { transform: scale(1.05); filter:none; box-shadow: 0 0 0 3px rgba(255,255,255,0.7); }
+        #scannerShutterBtn:active { transform: scale(0.92); filter:none; }
+
+        #scannerUploadBtn { position:relative; overflow:hidden; }
+        #scannerUploadBtn input[type=file] {
+            position:absolute; inset:0; opacity:0; cursor:pointer;
+            font-size:0; padding:0; border:none; background:none;
+        }
+
+        /* Result slide-up panel */
+        #scannerResultPanel {
+            position: absolute; bottom:0; left:0; right:0; z-index:6;
+            background: rgba(10,8,22,0.97);
+            backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255,255,255,0.09);
+            border-top-left-radius: 22px;
+            border-top-right-radius: 22px;
+            padding: 18px 20px 28px;
+            transform: translateY(100%);
+            transition: transform 0.36s cubic-bezier(0.34,1.26,0.64,1);
+            max-height: 58vh; overflow-y: auto;
+        }
+        #scannerResultPanel.visible { transform: translateY(0); }
+        .drag-handle {
+            width:38px; height:4px;
+            background: rgba(255,255,255,0.18);
+            border-radius:99px; margin: 0 auto 16px;
+        }
+        #scannerResultCard {
+            display:flex; gap:16px; align-items:flex-start;
+        }
+        #scannerResultImg {
+            width:88px; flex-shrink:0;
+            border-radius:9px;
+            box-shadow: 0 6px 22px rgba(0,0,0,0.65);
+            object-fit:cover;
+        }
+        #scannerResultDetails {
+            flex:1; min-width:0;
+            display:flex; flex-direction:column; gap:6px;
+        }
+        #scannerResultName {
+            font-family:'Cinzel',serif; font-size:1.08rem;
+            font-weight:700; color:#fff; margin:0;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        }
+        #scannerResultMeta { font-size:0.72rem; color:var(--text-muted); font-weight:600; }
+        #scannerResultPrice { font-size:1.1rem; font-weight:800; color:var(--accent-cyan); }
+        #scannerResultPrintingSelect {
+            width:100%;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color:#fff; border-radius:8px;
+            padding: 6px 10px; font-size:0.74rem; outline:none;
+            margin-top:2px;
+        }
+        #scannerResultSummonBtn {
+            width:100%; padding:12px;
+            border-radius:12px;
+            background: linear-gradient(135deg,var(--accent-purple),var(--accent-purple-hover));
+            color:#fff; font-size:0.9rem; font-weight:700;
+            border:none; cursor:pointer; margin-top:6px;
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            box-shadow: 0 4px 16px rgba(168,85,247,0.3);
+            transition: filter 0.2s, box-shadow 0.2s;
+        }
+        #scannerResultSummonBtn:hover { filter:brightness(1.12); transform:none; box-shadow: 0 6px 22px rgba(168,85,247,0.45); }
+        #scannerResultSummonBtn:disabled { opacity:0.5; cursor:not-allowed; }
+
+        /* Session history */
+        #scannerSessionDrawer {
+            margin-top:16px;
+            border-top:1px solid rgba(255,255,255,0.07);
+            padding-top:14px;
+        }
+        #scannerSessionList {
+            display:flex; flex-direction:column; gap:6px;
+            max-height:130px; overflow-y:auto;
+        }
+        .session-item {
+            display:flex; align-items:center; gap:10px;
+            padding:6px 8px;
+            background: rgba(255,255,255,0.03);
+            border:1px solid rgba(255,255,255,0.06);
+            border-radius:8px; font-size:0.78rem;
+        }
+        .session-item img { width:22px;height:30px;border-radius:3px;object-fit:cover;flex-shrink:0; }
+        .session-item .si-name { flex:1;min-width:0;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .session-item .si-price { color:var(--accent-cyan);font-weight:700;flex-shrink:0; }
+        .session-item .si-del { background:none;border:none;color:rgba(255,255,255,0.28);cursor:pointer;font-size:0.9rem;padding:2px 4px;flex-shrink:0; }
+        .session-item .si-del:hover { color:var(--accent-rose);transform:none;filter:none;box-shadow:none; }
     </style>
 
     <!-- Modal: Price Refresh Progress -->
@@ -2370,177 +2547,666 @@
         </div>
     </div>
 
-    <!-- Modal: Card Scanner -->
-    <div id="cardScannerModal" class="modal-overlay" style="display: none; align-items: center; justify-content: center; padding: 20px;">
-        <div class="glass-panel" style="width: 100%; max-width: 500px; padding: 25px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow: hidden;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
-                <h3 style="font-family: 'Cinzel', serif; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 8px;">📷 Card Scanner <span style="font-size: 0.6rem; background: #f59e0b; color: #000; padding: 2px 7px; border-radius: 4px; font-family: sans-serif; font-weight: 800; letter-spacing: 0.5px; vertical-align: middle; text-transform: uppercase;">Native Match</span><span id="sessionCounterBadge" style="display: none; font-size: 0.65rem; background: var(--accent-green); color: #fff; padding: 2px 6px; border-radius: 4px; font-family: sans-serif; font-weight: bold; margin-left: 6px; vertical-align: middle;">0 Summoned</span></h3>
-                <button type="button" id="closeScannerModalBtn" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+    <!-- ============================================================
+         NEW FULLSCREEN CARD SCANNER MODAL
+         ============================================================ -->
+    <div id="scannerFullscreenModal">
+        <video id="scannerFSVideo" autoplay playsinline muted></video>
+        <div id="scannerFSVignette"></div>
+
+        <!-- Top bar -->
+        <div id="scannerFSTopBar">
+            <button class="fs-icon-btn" id="scannerFSCloseBtn" title="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="19" height="19"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+            <select id="scannerFSCamSelect" title="Select Camera"></select>
+            <button class="fs-icon-btn" id="scannerFSTorchBtn" title="Torch">🔦</button>
+        </div>
+
+        <!-- Reticle -->
+        <div id="scannerReticle">
+            <div class="reticle-corner tl"></div>
+            <div class="reticle-corner tr"></div>
+            <div class="reticle-corner bl"></div>
+            <div class="reticle-corner br"></div>
+            <div id="scannerLaser"></div>
+        </div>
+
+        <!-- Status pill -->
+        <div id="scannerStatusPill">Align card inside the frame</div>
+
+        <!-- Bottom bar -->
+        <div id="scannerFSBottomBar">
+            <div id="scannerFSAutoStatus"></div>
+            <div id="scannerFSSearchRow">
+                <input id="scannerFSSearchInput" type="text" placeholder="🔍 Type card name...">
+                <button id="scannerFSSearchBtn">Search</button>
             </div>
-            
-            <!-- Row 1: Camera settings -->
-            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; flex-shrink: 0; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border);">
-                <div style="display: flex; gap: 8px; align-items: center; flex: 1.5; min-width: 140px;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Camera:</span>
-                    <select id="cameraSelect" style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; outline: none;"></select>
+            <div id="scannerFSSettingsRow">
+                <div class="fs-pill-toggle">
+                    <button id="fsFoilNormal" class="active">Normal</button>
+                    <button id="fsFoilFoil">Foil</button>
                 </div>
-                <div style="display: flex; gap: 6px; align-items: center;" id="torchContainer">
-                    <button type="button" id="torchBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; height: 28px;">
-                        <span>🔦</span> <span id="torchBtnText">Torch On</span>
+                <select class="fs-condition-select" id="fsConditionSelect">
+                    <option value="Near Mint">Near Mint</option>
+                    <option value="Lightly Played">Lightly Played</option>
+                    <option value="Moderately Played">Moderately Played</option>
+                    <option value="Heavily Played">Heavily Played</option>
+                    <option value="Damaged">Damaged</option>
+                </select>
+                <div class="fs-zoom-row">
+                    <span>🔍</span>
+                    <input type="range" id="fsZoomSlider" min="1" max="4" step="0.1" value="1">
+                    <span id="fsZoomVal">1.0x</span>
+                </div>
+            </div>
+            <div id="scannerFSActionsRow">
+                <div style="display:flex;gap:10px;flex:1;justify-content:flex-start;">
+                    <button class="fs-icon-btn" id="scannerAutoBtn" title="Auto-Scan">🤖</button>
+                    <button class="fs-icon-btn" id="scannerUploadBtn" title="Upload Image">
+                        📂<input type="file" id="scannerFSFileInput" accept="image/*">
                     </button>
                 </div>
-                <div style="display: flex; gap: 6px; align-items: center;" id="autoScanContainer">
-                    <button type="button" id="autoScanBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; height: 28px; transition: all 0.2s ease;">
-                        <span id="autoScanEmoji">🤖</span> <span id="autoScanBtnText">Auto-Scan Off</span>
-                    </button>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 160px;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Zoom:</span>
-                    <input type="range" id="cameraZoomSlider" min="1" max="4" step="0.1" value="1" style="flex: 1; accent-color: var(--accent-purple); height: 4px; cursor: pointer;">
-                    <span id="cameraZoomVal" style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; width: 25px; text-align: right;">1.0x</span>
-                </div>
-            </div>
-
-            <!-- Row 2: Scan Pre-settings -->
-            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; flex-shrink: 0; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); margin-top: -5px;">
-                <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 140px;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Type:</span>
-                    <div style="display: flex; background: rgba(0,0,0,0.3); padding: 2px; border-radius: 6px; border: 1px solid var(--panel-border);">
-                        <button type="button" id="prefFoilNormalBtn" style="padding: 3px 8px; font-size: 0.75rem; border: none; border-radius: 4px; background: var(--accent-purple); color: #fff; font-weight: bold; cursor: pointer; transition: all 0.2s;">Normal</button>
-                        <button type="button" id="prefFoilFoilBtn" style="padding: 3px 8px; font-size: 0.75rem; border: none; border-radius: 4px; background: transparent; color: var(--text-muted); font-weight: bold; cursor: pointer; transition: all 0.2s;">Foil</button>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; flex: 1.5; min-width: 220px;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Condition:</span>
-                    <select id="prefConditionSelect" style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; outline: none;">
-                        <option value="Near Mint">Near Mint</option>
-                        <option value="Lightly Played">Lightly Played</option>
-                        <option value="Moderately Played">Moderately Played</option>
-                        <option value="Heavily Played">Heavily Played</option>
-                        <option value="Damaged">Damaged</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- ManaBox Viewport Refactor: Full uncropped frame presentation, masks letterboxing artifacting outside camera frame bounds -->
-            <div id="videoContainer" style="position: relative; width: 100%; height: 360px; max-height: 45vh; background: #05040a; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 auto;">
-                <video id="scannerVideo" autoplay playsinline style="display: block; width: 100%; height: 100%; object-fit: cover; margin: 0 auto;"></video>
-                <!-- Outer background shadowing layout layer mimicking a true focal mask card environment -->
-                <div id="scannerOverlayContainer" style="position: absolute; overflow: hidden; pointer-events: none; z-index: 2; border-radius: 12px; width: 100%; height: 100%; top: 0; left: 0;">
-                    <!-- Fixed ManaBox Target Bounding Sight Box -->
-                    <div id="scannerGuideBox" class="scanner-guide-box" style="box-shadow: 0 0 0 9999px rgba(5, 4, 10, 0.65);">
-                        <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
-                        
-                        <!-- Fixed Target Zones -->
-                        <div style="width: 100%; border-bottom: 1px dashed rgba(255,255,255,0.25); height: 14%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(168, 85, 247, 0.12); border-top-left-radius: 5px; border-top-right-radius: 5px;">
-                            <span style="font-size: 0.6rem; color: #fff; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">Card Title Zone</span>
-                        </div>
-                        <div style="width: 55%; border-top: 1px dashed rgba(255,255,255,0.25); border-right: 1px dashed rgba(255,255,255,0.25); height: 14%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: rgba(6, 182, 212, 0.12); align-self: flex-start; border-bottom-left-radius: 5px; margin-top: auto;">
-                            <span style="font-size: 0.55rem; color: #fff; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">Set Info</span>
-                        </div>
-                    </div>
-                </div>
-                <!-- Auto-Scan Status Bar Overlay -->
-                <div id="autoScanStatusContainer" style="display: none; position: absolute; bottom: 0; left: 0; right: 0; background: rgba(12, 10, 28, 0.9); backdrop-filter: blur(4px); padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.1); align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 0.82rem; color: var(--text-main); text-align: center; pointer-events: none; z-index: 10;">
-                    <span id="autoScanStatusText"> Ready for next card...</span>
-                </div>
-            </div>
-
-            <!-- Manual Trigger Buttons Row -->
-            <div style="display: flex; gap: 10px; flex-shrink: 0;">
-                <button type="button" id="captureBtn" class="btn" style="flex: 1; padding: 10px; background: var(--accent-purple); font-weight: 700; font-size: 0.85rem; border-radius: 8px; border: none; color: #fff; cursor: pointer;">Capture & Scan</button>
-                <button type="button" id="uploadFileBtn" class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; border-radius: 8px; border: none; cursor: pointer; position: relative; font-weight: 700;">
-                    <span>Upload Image</span>
-                    <input type="file" id="scannerFileInput" accept="image/*" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0; cursor: pointer;">
+                <button id="scannerShutterBtn" title="Capture & Scan">
+                    <svg viewBox="0 0 24 24" fill="#1a1025" width="30" height="30"><circle cx="12" cy="12" r="8"/></svg>
                 </button>
-            </div>
-
-            <!-- Scrollable Content Block -->
-            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 4px; scrollbar-width: thin;">
-
-                <!-- Manual Search Bar Fallback -->
-                <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 4px; flex-shrink: 0;">
-                    <input type="text" id="scannerSearchInput" placeholder="🔍 Or type card name to search..." style="flex: 1; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; box-sizing: border-box; font-family: inherit;">
-                    <button type="button" id="scannerSearchBtn" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; height: 35px; display: inline-flex; align-items: center; justify-content: center;">Search</button>
-                </div>
-
-                <canvas id="scannerCanvas" style="display: none;"></canvas>
-                <canvas id="scannerFullCanvas" style="display: none;"></canvas>
-
-                <!-- Active Card Match Panel -->
-                <div id="activeMatchContainer" style="display: none; padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; flex-shrink: 0; gap: 15px; align-items: flex-start; margin-top: 5px;">
-                    <!-- Left: Card Image -->
-                    <div style="width: 100px; height: 139px; flex-shrink: 0; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-                        <img id="activeMatchImage" style="width: 100%; height: 100%; object-fit: contain;" alt="Active Card Match">
-                    </div>
-                    <!-- Right: Details & Summon Button -->
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0;">
-                        <div>
-                            <h4 id="activeMatchName" style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Card Name</h4>
-                            <div id="activeMatchSetInfo" style="color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; font-weight: 600;">SET #123 · Rarity</div>
-                        </div>
-                        <div style="display: flex; gap: 12px; align-items: center; margin-top: 2px;">
-                            <span id="activeMatchPrice" style="font-size: 0.95rem; font-weight: 800; color: var(--accent-cyan);">$0.00</span>
-                            <span id="activeMatchStatusBadge" style="font-size: 0.65rem; background: var(--accent-purple); color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: bold; text-transform: uppercase;">Detected</span>
-                        </div>
-                        <!-- Manual Summon Action Button -->
-                        <button type="button" id="activeMatchSummonBtn" class="btn" style="width: 100%; padding: 8px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 6px; border: none; background: var(--accent-purple); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;">
-                            <span>🔮</span> <span>Summon Card</span>
-                        </button>
-                        <!-- Alternate Printings Dropdown -->
-                        <div id="activeMatchAltsContainer" style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
-                            <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Switch Printing:</span>
-                            <select id="activeMatchAltsSelect" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--text-main); border: 1px solid var(--panel-border); padding: 4px 6px; border-radius: 6px; font-size: 0.75rem; outline: none;"></select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Session Queue Panel -->
-                <div id="sessionQueueContainer" style="display: none; flex-direction: column; gap: 8px; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 5px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Session Scan History</span>
-                        <span id="sessionQueueTotal" style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 700;">0 cards · $0.00</span>
-                    </div>
-                    <div id="sessionQueueList" style="display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; scrollbar-width: thin; padding-right: 2px;"></div>
-                </div>
-
-                <!-- Collapsible Calibration Panel -->
-                <div style="border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: rgba(255,255,255,0.01); overflow: hidden; flex-shrink: 0; margin-top: 5px;">
-                    <button type="button" id="toggleCalibrationBtn" style="width: 100%; background: none; border: none; padding: 8px 12px; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; outline: none;">
-                        <span>⚙️ OCR Calibration Sights</span>
-                        <span id="calibrationArrow" style="transition: transform 0.2s ease;">▼</span>
+                <div style="display:flex;gap:10px;flex:1;justify-content:flex-end;position:relative;">
+                    <button class="fs-icon-btn" id="scannerHistoryBtn" title="Session History" style="position:relative;">
+                        📋
+                        <span id="scannerSessionBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:var(--accent-green);color:#fff;font-size:0.55rem;font-weight:800;border-radius:99px;padding:1px 5px;pointer-events:none;line-height:1.4;"></span>
                     </button>
-                    <div id="calibrationContent" style="display: none; padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-direction: column; gap: 12px;">
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Captured Card Preview</div>
-                            <div style="position: relative; width: 100%; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
-                                <img id="scannerFullPreview" style="width: 100%; height: auto; display: block;" alt="Full Captured View">
-                                <div id="scannerCropHighlight" style="position: absolute; border: 2px dashed var(--accent-purple); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); pointer-events: none; border-radius: 4px; box-sizing: border-box;"></div>
-                            </div>
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px;">
-                            <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Title Zone Sight</div>
-                                <img id="scannerCropPreview" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); filter: contrast(1.3) brightness(1.2); max-height: 40px; object-fit: contain; background: #000;" alt="Crop Sight Preview">
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Set Info Sight</div>
-                                <img id="scannerSetCropPreview" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); filter: contrast(1.3) brightness(1.2); max-height: 40px; object-fit: contain; background: #000;" alt="Set Crop Sight Preview">
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
-            
-            <!-- Tips Panel -->
-            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;">
-                <span style="font-weight: 700; color: var(--accent-cyan); display: flex; align-items: center; gap: 4px;">💡 Tips for Perfect Scans:</span>
-                <span>• Align the entire card inside the purple border.</span>
-                <span>• Avoid overhead glare on the card surface.</span>
-                <span>• If OCR misreads a character, edit it directly in the pre-filled input box and press Enter!</span>
             </div>
         </div>
+
+        <!-- Slide-up result panel -->
+        <div id="scannerResultPanel">
+            <div class="drag-handle"></div>
+            <div id="scannerResultCard">
+                <img id="scannerResultImg" src="" alt="Card art">
+                <div id="scannerResultDetails">
+                    <h4 id="scannerResultName">Card Name</h4>
+                    <div id="scannerResultMeta">SET · Rarity</div>
+                    <div id="scannerResultPrice">$0.00</div>
+                    <select id="scannerResultPrintingSelect"></select>
+                    <button id="scannerResultSummonBtn">
+                        <span>🔮</span><span id="scannerResultBtnText">Add to Vault</span>
+                    </button>
+                </div>
+            </div>
+            <div id="scannerSessionDrawer" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Session History</span>
+                    <span id="scannerSessionTotal" style="font-size:0.72rem;color:var(--accent-cyan);font-weight:700;"></span>
+                </div>
+                <div id="scannerSessionList"></div>
+            </div>
+        </div>
+
+        <!-- Hidden canvases -->
+        <canvas id="scannerFSCanvas" style="display:none;"></canvas>
+        <canvas id="scannerCanvas"   style="display:none;"></canvas>
     </div>
+
+    <script>
+    // ================================================================
+    //  FULLSCREEN CARD SCANNER  (complete rewrite v4)
+    //  Full-frame OCR on reticle region → Scryfall fuzzy lookup
+    //  → slide-up result card → Add to Vault
+    // ================================================================
+    (function() {
+        'use strict';
+
+        var fsStream = null, fsAutoScan = false, fsAutoTimer = null,
+            fsIsOCRRunning = false, fsLastKey = '', fsCurrentPrintings = [],
+            fsCurrentPrinting = null, fsIsFoil = false, fsZoom = 1.0,
+            fsTorchOn = false, fsSessionQueue = [], fsScanCount = 0,
+            fsHistoryOpen = false;
+
+        var elModal, elVideo, elReticle, elStatusPill, elAutoStatus,
+            elCamSel, elTorchBtn, elAutoBtn, elShutter, elUploadInput,
+            elHistoryBtn, elSessionBadge, elResultPanel, elResultImg,
+            elResultName, elResultMeta, elResultPrice, elResultPrintSel,
+            elResultSummonBtn, elResultBtnText, elSessionDrawer,
+            elSessionList, elSessionTotal, elSearchInput, elSearchBtn,
+            elZoomSlider, elZoomVal, elFoilNormal, elFoilFoil,
+            elConditionSel, elFSCanvas, elScanCanvas;
+
+        function init() {
+            elModal          = document.getElementById('scannerFullscreenModal');
+            elVideo          = document.getElementById('scannerFSVideo');
+            elReticle        = document.getElementById('scannerReticle');
+            elStatusPill     = document.getElementById('scannerStatusPill');
+            elAutoStatus     = document.getElementById('scannerFSAutoStatus');
+            elCamSel         = document.getElementById('scannerFSCamSelect');
+            elTorchBtn       = document.getElementById('scannerFSTorchBtn');
+            elAutoBtn        = document.getElementById('scannerAutoBtn');
+            elShutter        = document.getElementById('scannerShutterBtn');
+            elUploadInput    = document.getElementById('scannerFSFileInput');
+            elHistoryBtn     = document.getElementById('scannerHistoryBtn');
+            elSessionBadge   = document.getElementById('scannerSessionBadge');
+            elResultPanel    = document.getElementById('scannerResultPanel');
+            elResultImg      = document.getElementById('scannerResultImg');
+            elResultName     = document.getElementById('scannerResultName');
+            elResultMeta     = document.getElementById('scannerResultMeta');
+            elResultPrice    = document.getElementById('scannerResultPrice');
+            elResultPrintSel = document.getElementById('scannerResultPrintingSelect');
+            elResultSummonBtn= document.getElementById('scannerResultSummonBtn');
+            elResultBtnText  = document.getElementById('scannerResultBtnText');
+            elSessionDrawer  = document.getElementById('scannerSessionDrawer');
+            elSessionList    = document.getElementById('scannerSessionList');
+            elSessionTotal   = document.getElementById('scannerSessionTotal');
+            elSearchInput    = document.getElementById('scannerFSSearchInput');
+            elSearchBtn      = document.getElementById('scannerFSSearchBtn');
+            elZoomSlider     = document.getElementById('fsZoomSlider');
+            elZoomVal        = document.getElementById('fsZoomVal');
+            elFoilNormal     = document.getElementById('fsFoilNormal');
+            elFoilFoil       = document.getElementById('fsFoilFoil');
+            elConditionSel   = document.getElementById('fsConditionSelect');
+            elFSCanvas       = document.getElementById('scannerFSCanvas');
+            elScanCanvas     = document.getElementById('scannerCanvas');
+
+            if (!elModal) return;
+
+            document.getElementById('scannerFSCloseBtn').addEventListener('click', closeScanner);
+            elShutter.addEventListener('click', captureAndScan);
+            elAutoBtn.addEventListener('click', toggleAutoScan);
+            elTorchBtn.addEventListener('click', toggleTorch);
+            elCamSel.addEventListener('change', function() { startCamera(elCamSel.value); });
+            elZoomSlider.addEventListener('input', function() {
+                fsZoom = parseFloat(elZoomSlider.value);
+                elZoomVal.textContent = fsZoom.toFixed(1) + 'x';
+                applyZoom();
+                localStorage.setItem('scanner_zoom', fsZoom);
+            });
+            elFoilNormal.addEventListener('click', function() {
+                fsIsFoil = false;
+                elFoilNormal.classList.add('active'); elFoilFoil.classList.remove('active');
+                refreshResultPrice();
+            });
+            elFoilFoil.addEventListener('click', function() {
+                fsIsFoil = true;
+                elFoilFoil.classList.add('active'); elFoilNormal.classList.remove('active');
+                refreshResultPrice();
+            });
+            elConditionSel.addEventListener('change', function() { fsCondition = elConditionSel.value; });
+            elUploadInput.addEventListener('change', handleFileUpload);
+            elHistoryBtn.addEventListener('click', function() {
+                fsHistoryOpen = !fsHistoryOpen;
+                elSessionDrawer.style.display = fsHistoryOpen ? 'block' : 'none';
+                elResultPanel.classList.add('visible');
+                elHistoryBtn.classList.toggle('active', fsHistoryOpen);
+            });
+            elResultPrintSel.addEventListener('change', function() {
+                var idx = parseInt(elResultPrintSel.value);
+                if (fsCurrentPrintings[idx]) {
+                    fsCurrentPrinting = fsCurrentPrintings[idx];
+                    renderResultCard();
+                    elResultSummonBtn.disabled = false;
+                    elResultBtnText.textContent = 'Add to Vault';
+                    elResultSummonBtn.style.background = '';
+                }
+            });
+            elResultSummonBtn.addEventListener('click', function() { summonCard(false); });
+
+            function doSearch() {
+                var q = elSearchInput.value.trim();
+                if (!q) return;
+                setStatus('Searching...', 'scanning');
+                lookupScryfall(q, false);
+            }
+            elSearchBtn.addEventListener('click', doSearch);
+            elSearchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+            });
+
+            // Restore saved settings
+            fsZoom = parseFloat(localStorage.getItem('scanner_zoom')) || 1.0;
+            elZoomSlider.value = fsZoom;
+            elZoomVal.textContent = fsZoom.toFixed(1) + 'x';
+            if (localStorage.getItem('scanner_autoScan') === 'true') {
+                fsAutoScan = true; elAutoBtn.classList.add('active');
+            }
+
+            window.addEventListener('resize', positionReticle);
+
+            // Wire up any "open scanner" button
+            var openBtns = document.querySelectorAll('[id="openScannerBtn"], .open-scanner-btn');
+            openBtns.forEach(function(btn) {
+                btn.addEventListener('click', openScanner);
+            });
+        }
+
+        // ---- Open / Close ----
+        function openScanner() {
+            elModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            fsSessionQueue = []; fsScanCount = 0; fsLastKey = '';
+            fsHistoryOpen = false;
+            elSessionDrawer.style.display = 'none';
+            elHistoryBtn.classList.remove('active');
+            elResultPanel.classList.remove('visible');
+            setStatus('Align card inside the frame', '');
+            elAutoStatus.textContent = '';
+            window.scannerMadeAdditions = false;
+            startCamera();
+        }
+
+        function closeScanner() {
+            elModal.classList.remove('active');
+            document.body.style.overflow = '';
+            stopCamera();
+            stopAutoScan();
+            if (window.scannerMadeAdditions) window.location.reload();
+        }
+
+        // ---- Camera ----
+        function startCamera(deviceId) {
+            stopCamera();
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setStatus('Camera not supported', 'error'); return;
+            }
+            var savedId = deviceId || localStorage.getItem('scanner_deviceId');
+            var constraints = {
+                video: {
+                    width: { ideal: 1920 }, height: { ideal: 1080 },
+                    deviceId: savedId ? { ideal: savedId } : undefined,
+                    facingMode: savedId ? undefined : { ideal: 'environment' }
+                }, audio: false
+            };
+            navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+                fsStream = stream;
+                elVideo.srcObject = stream;
+                elVideo.onloadedmetadata = function() {
+                    positionReticle();
+                    applyZoom();
+                    if (fsAutoScan) scheduleAutoScan();
+                };
+                populateCameraList();
+            }).catch(function(err) {
+                setStatus('Camera failed: ' + err.message, 'error');
+            });
+        }
+
+        function stopCamera() {
+            if (fsStream) { fsStream.getTracks().forEach(function(t){t.stop();}); fsStream = null; }
+            elVideo.srcObject = null;
+        }
+
+        function populateCameraList() {
+            navigator.mediaDevices.enumerateDevices().then(function(devs) {
+                var vids = devs.filter(function(d){return d.kind==='videoinput';});
+                var activeId = null;
+                if (fsStream) {
+                    var tracks = fsStream.getVideoTracks();
+                    if (tracks.length) activeId = tracks[0].getSettings().deviceId;
+                }
+                elCamSel.innerHTML = '';
+                vids.forEach(function(d, i) {
+                    var opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.textContent = d.label || ('Camera ' + (i+1));
+                    if (activeId && d.deviceId === activeId) opt.selected = true;
+                    elCamSel.appendChild(opt);
+                });
+            });
+        }
+
+        function applyZoom() {
+            if (!fsStream) return;
+            var track = fsStream.getVideoTracks()[0];
+            if (!track) return;
+            var caps = track.getCapabilities ? track.getCapabilities() : {};
+            if (caps.zoom) {
+                var z = Math.max(caps.zoom.min, Math.min(caps.zoom.max, fsZoom));
+                track.applyConstraints({ advanced: [{ zoom: z }] }).catch(function() {
+                    elVideo.style.transform = 'scale(' + fsZoom + ')';
+                    elVideo.style.transformOrigin = 'center';
+                });
+            } else {
+                elVideo.style.transform = 'scale(' + fsZoom + ')';
+                elVideo.style.transformOrigin = 'center';
+            }
+        }
+
+        function toggleTorch() {
+            if (!fsStream) return;
+            var track = fsStream.getVideoTracks()[0];
+            var caps = track.getCapabilities ? track.getCapabilities() : {};
+            if (!caps.torch) { alert('Torch not supported on this camera.'); return; }
+            fsTorchOn = !fsTorchOn;
+            track.applyConstraints({ advanced: [{ torch: fsTorchOn }] }).then(function() {
+                elTorchBtn.classList.toggle('active', fsTorchOn);
+            });
+        }
+
+        // ---- Reticle ----
+        var CARD_RATIO = 2.5 / 3.5;
+
+        function positionReticle() {
+            if (!elReticle) return;
+            var vw = window.innerWidth, vh = window.innerHeight;
+            var maxW = vw * 0.75, maxH = vh * 0.56;
+            var rW, rH;
+            if (maxW / CARD_RATIO <= maxH) { rW = maxW; rH = rW / CARD_RATIO; }
+            else { rH = maxH; rW = rH * CARD_RATIO; }
+            var rX = (vw - rW) / 2;
+            var rY = (vh - rH) / 2 - 45;
+            elReticle.style.width  = rW + 'px';
+            elReticle.style.height = rH + 'px';
+            elReticle.style.left   = rX + 'px';
+            elReticle.style.top    = rY + 'px';
+            elStatusPill.style.left      = (rX + rW / 2) + 'px';
+            elStatusPill.style.top       = (rY - 50) + 'px';
+            elStatusPill.style.transform = 'translateX(-50%)';
+        }
+
+        function setStatus(text, state) {
+            elStatusPill.textContent = text;
+            elReticle.className = '';
+            if (state) elReticle.classList.add('state-' + state);
+        }
+
+        // ---- Auto-scan ----
+        function toggleAutoScan() {
+            fsAutoScan = !fsAutoScan;
+            elAutoBtn.classList.toggle('active', fsAutoScan);
+            localStorage.setItem('scanner_autoScan', fsAutoScan);
+            if (fsAutoScan) {
+                elAutoStatus.textContent = '🤖 Auto-scan active';
+                scheduleAutoScan();
+            } else {
+                stopAutoScan();
+                elAutoStatus.textContent = '';
+            }
+        }
+
+        function scheduleAutoScan() {
+            clearTimeout(fsAutoTimer);
+            if (!fsAutoScan) return;
+            fsAutoTimer = setTimeout(function() {
+                if (!fsIsOCRRunning && fsAutoScan) runScan(true);
+                scheduleAutoScan();
+            }, 2400);
+        }
+
+        function stopAutoScan() { clearTimeout(fsAutoTimer); }
+
+        // ---- Capture ----
+        function captureAndScan() { stopAutoScan(); runScan(false); }
+
+        function runScan(isAuto) {
+            if (fsIsOCRRunning) return;
+            if (!elVideo.videoWidth || !elVideo.videoHeight) return;
+            var dataUrl = captureReticleFrame();
+            if (!dataUrl) return;
+            fsIsOCRRunning = true;
+            setStatus('Reading card...', 'scanning');
+            if (!isAuto) elAutoStatus.textContent = '';
+
+            Tesseract.recognize(dataUrl, 'eng', {
+                tessedit_pageseg_mode: '1',
+                tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 '-,/."
+            }).then(function(result) {
+                fsIsOCRRunning = false;
+                var name = extractCardName(result.data.text);
+                if (!name) {
+                    setStatus('Adjust angle or lighting and retry', 'error');
+                    if (isAuto) elAutoStatus.textContent = '⚠️ Could not read card';
+                    if (fsAutoScan) scheduleAutoScan();
+                    return;
+                }
+                if (isAuto && name.toLowerCase() === fsLastKey.toLowerCase()) {
+                    setStatus('Card in frame: ' + name, 'matched');
+                    if (fsAutoScan) scheduleAutoScan();
+                    return;
+                }
+                fsLastKey = name;
+                setStatus('Found: ' + name, 'matched');
+                if (isAuto) elAutoStatus.textContent = '🔍 Detected: "' + name + '"';
+                lookupScryfall(name, isAuto);
+            }).catch(function(err) {
+                fsIsOCRRunning = false;
+                console.error('OCR error:', err);
+                setStatus('OCR failed — try again', 'error');
+                if (fsAutoScan) scheduleAutoScan();
+            });
+        }
+
+        function captureReticleFrame() {
+            if (!elVideo.videoWidth) return null;
+            var vw = elVideo.videoWidth, vh = elVideo.videoHeight;
+            var dw = elVideo.clientWidth, dh = elVideo.clientHeight;
+            var scale = Math.max(dw / vw, dh / vh);
+            var rendW = vw * scale, rendH = vh * scale;
+            var offX = (dw - rendW) / 2, offY = (dh - rendH) / 2;
+            var rect    = elReticle.getBoundingClientRect();
+            var vidRect = elVideo.getBoundingClientRect();
+            var rx = rect.left - vidRect.left;
+            var ry = rect.top  - vidRect.top;
+            var rw = rect.width, rh = rect.height;
+            var srcX = (rx - offX) / scale, srcY = (ry - offY) / scale;
+            var srcW = rw / scale,           srcH = rh / scale;
+            var outW = Math.round(srcW * 2), outH = Math.round(srcH * 2);
+            elFSCanvas.width = outW; elFSCanvas.height = outH;
+            var ctx = elFSCanvas.getContext('2d');
+            ctx.drawImage(elVideo, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+            // Grayscale + contrast boost
+            var imgData = ctx.getImageData(0, 0, outW, outH);
+            var d = imgData.data;
+            for (var i = 0; i < d.length; i += 4) {
+                var lum = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+                lum = Math.max(0, Math.min(255, 1.4*(lum-128)+128));
+                d[i] = d[i+1] = d[i+2] = lum;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            return elFSCanvas.toDataURL('image/png');
+        }
+
+        function extractCardName(text) {
+            if (!text) return '';
+            var lines = text.split('\n').map(function(l) {
+                return l.replace(/[^a-zA-Z0-9\s',\-\/\.!]/g, '').trim();
+            }).filter(function(l){ return l.length >= 3; });
+            for (var i = 0; i < lines.length; i++) {
+                var l = lines[i];
+                if (/[a-zA-Z]{2,}/.test(l) && l.length >= 3 && l.length <= 50) return l;
+            }
+            return '';
+        }
+
+        // ---- Scryfall ----
+        function lookupScryfall(name, isAuto) {
+            setStatus('Looking up on Scryfall...', 'scanning');
+            fetch('https://api.scryfall.com/cards/named?fuzzy=' + encodeURIComponent(name))
+                .then(function(r) {
+                    if (r.ok) return r.json().then(function(card){ return [card]; });
+                    return fetch('https://api.scryfall.com/cards/search?q=' + encodeURIComponent(name) + '&unique=prints')
+                        .then(function(r2){ return r2.ok ? r2.json().then(function(d){ return d.data||[]; }) : []; });
+                })
+                .then(function(cards) {
+                    if (!cards || !cards.length) throw new Error('No match');
+                    fsCurrentPrintings = cards;
+                    fsCurrentPrinting  = cards[0];
+                    renderResultCard();
+                    elResultPanel.classList.add('visible');
+                    setStatus('Card found!', 'matched');
+                    playBeep(660, 0.1);
+                    if (isAuto && fsAutoScan) {
+                        elAutoStatus.textContent = '🎉 Found: ' + fsCurrentPrinting.name;
+                        summonCard(true);
+                    }
+                    if (fsAutoScan) scheduleAutoScan();
+                })
+                .catch(function(err) {
+                    console.warn('Scryfall lookup failed:', err);
+                    setStatus('No match for "' + name + '"', 'error');
+                    if (isAuto) elAutoStatus.textContent = '⚠️ No match for "' + name + '"';
+                    if (fsAutoScan) scheduleAutoScan();
+                });
+        }
+
+        function renderResultCard() {
+            if (!fsCurrentPrinting) return;
+            var card = fsCurrentPrinting;
+            var imgUrl = (card.image_uris && card.image_uris.normal)
+                || (card.card_faces && card.card_faces[0] && card.card_faces[0].image_uris && card.card_faces[0].image_uris.normal)
+                || '';
+            elResultImg.src = imgUrl;
+            elResultName.textContent = card.name;
+            elResultMeta.textContent = card.set.toUpperCase() + ' #' + card.collector_number + ' · ' + card.rarity.toUpperCase();
+            refreshResultPrice();
+
+            elResultPrintSel.innerHTML = '';
+            fsCurrentPrintings.forEach(function(c, i) {
+                var opt = document.createElement('option');
+                opt.value = i;
+                var p = c.prices;
+                opt.textContent = c.set.toUpperCase() + ' #' + c.collector_number
+                    + ' · $' + (p.usd || '?') + ' / Foil $' + (p.usd_foil || '?');
+                if (c.id === card.id) opt.selected = true;
+                elResultPrintSel.appendChild(opt);
+            });
+
+            elResultBtnText.textContent = 'Add to Vault';
+            elResultSummonBtn.disabled = false;
+            elResultSummonBtn.style.background = '';
+        }
+
+        function refreshResultPrice() {
+            if (!fsCurrentPrinting) return;
+            var p = fsCurrentPrinting.prices;
+            var val = fsIsFoil ? (p.usd_foil || p.usd || '0.00') : (p.usd || '0.00');
+            elResultPrice.textContent = '$' + val;
+        }
+
+        // ---- Add to Collection ----
+        function summonCard(isAuto) {
+            if (!fsCurrentPrinting) return;
+            var card = fsCurrentPrinting;
+            elResultSummonBtn.disabled = true;
+            elResultBtnText.textContent = 'Adding...';
+
+            var fd = new FormData();
+            fd.append('set_code', card.set.toUpperCase());
+            fd.append('collector_number', card.collector_number);
+            fd.append('condition', elConditionSel.value);
+            if (fsIsFoil) fd.append('is_foil', 'y');
+
+            fetch('/api/add', { method: 'POST', body: fd })
+                .then(function(r) {
+                    if (!r.ok) throw new Error('Add failed');
+                    return r.json();
+                })
+                .then(function(added) {
+                    window.scannerMadeAdditions = true;
+                    fsScanCount++;
+                    playBeep(700, 0.12);
+                    elResultBtnText.textContent = '✓ Added to Vault';
+                    elResultSummonBtn.style.background = 'var(--accent-green)';
+                    elSessionBadge.textContent = fsScanCount;
+                    elSessionBadge.style.display = 'block';
+                    fsSessionQueue.unshift({
+                        id: added.card_id, name: added.name,
+                        set_code: added.set_code, collector_number: added.collector_number,
+                        is_foil: added.is_foil, condition: added.condition,
+                        price: added.price, image_url: added.image_url
+                    });
+                    renderSessionList();
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    elResultBtnText.textContent = '✕ Failed — Retry';
+                    elResultSummonBtn.style.background = 'var(--accent-rose)';
+                    elResultSummonBtn.disabled = false;
+                });
+        }
+
+        function renderSessionList() {
+            elSessionList.innerHTML = '';
+            var total = 0;
+            fsSessionQueue.forEach(function(item, idx) {
+                total += parseFloat(item.price || 0);
+                var div = document.createElement('div');
+                div.className = 'session-item';
+                var foilTag = item.is_foil
+                    ? '<span style="background:linear-gradient(135deg,#ec4899,#3b82f6);color:#0c0a1c;font-size:0.55rem;padding:1px 4px;border-radius:3px;font-weight:800;">FOIL</span>'
+                    : '';
+                div.innerHTML = '<img src="' + (item.image_url||'') + '" alt="">'
+                    + '<span class="si-name">' + item.name + ' ' + foilTag + '</span>'
+                    + '<span class="si-price">$' + parseFloat(item.price||0).toFixed(2) + '</span>'
+                    + '<button class="si-del" title="Remove">🗑️</button>';
+                (function(i, el){
+                    el.querySelector('.si-del').addEventListener('click', function() {
+                        fetch('/api/delete/' + item.id, { method: 'POST' }).then(function(r) {
+                            if (r.ok) {
+                                fsSessionQueue.splice(i, 1);
+                                fsScanCount = Math.max(0, fsScanCount - 1);
+                                elSessionBadge.textContent = fsScanCount;
+                                elSessionBadge.style.display = fsScanCount > 0 ? 'block' : 'none';
+                                renderSessionList();
+                            }
+                        });
+                    });
+                })(idx, div);
+                elSessionList.appendChild(div);
+            });
+            elSessionTotal.textContent = fsSessionQueue.length + ' card' + (fsSessionQueue.length !== 1 ? 's' : '') + ' · $' + total.toFixed(2);
+        }
+
+        // ---- File Upload ----
+        function handleFileUpload(e) {
+            var file = e.target.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(evt) {
+                var img = new Image();
+                img.onload = function() {
+                    elFSCanvas.width = img.width; elFSCanvas.height = img.height;
+                    elFSCanvas.getContext('2d').drawImage(img, 0, 0);
+                    setStatus('Reading uploaded image...', 'scanning');
+                    fsIsOCRRunning = true;
+                    Tesseract.recognize(elFSCanvas.toDataURL('image/png'), 'eng', {
+                        tessedit_pageseg_mode: '1'
+                    }).then(function(result) {
+                        fsIsOCRRunning = false;
+                        var name = extractCardName(result.data.text);
+                        if (name) {
+                            setStatus('Detected: ' + name, 'matched');
+                            elSearchInput.value = name;
+                            lookupScryfall(name, false);
+                        } else {
+                            setStatus('Could not read — try manual search', 'error');
+                        }
+                    }).catch(function() {
+                        fsIsOCRRunning = false;
+                        setStatus('OCR failed on image', 'error');
+                    });
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        }
+
+        // ---- Beep ----
+        function playBeep(freq, dur) {
+            try {
+                var ctx2 = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx2.createOscillator(), gain = ctx2.createGain();
+                osc.connect(gain); gain.connect(ctx2.destination);
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.value = 0.05;
+                osc.start(); osc.stop(ctx2.currentTime + dur);
+            } catch(e) {}
+        }
+
+        // ---- Boot ----
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+
+        window.openCardScanner = function() { init(); openScanner(); };
+    })();
+    </script>
 </body>
 </html>
