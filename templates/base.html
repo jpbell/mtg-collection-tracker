@@ -1136,14 +1136,21 @@
 
         function adjustScannerLayout() {
             const video = document.getElementById('scannerVideo');
+            const overlay = document.getElementById('scannerOverlayContainer');
             const guideBox = document.getElementById('scannerGuideBox');
-            if (!video || !guideBox) return;
+            if (!video || !overlay || !guideBox) return;
             
             const dW = video.clientWidth;
             const dH = video.clientHeight;
             if (!dW || !dH) return;
             
-            // Cards are typically 2.5" x 3.5" (ratio ~0.714)
+            // Position and size the overlay container to match the active video stream exactly
+            overlay.style.width = `${dW}px`;
+            overlay.style.height = `${dH}px`;
+            overlay.style.top = `${video.offsetTop}px`;
+            overlay.style.left = `${video.offsetLeft}px`;
+            
+            // Size guide box to match MTG card aspect ratio 2.5:3.5 (0.714)
             const ratio = 0.714;
             const maxWidth = dW * 0.85;
             const maxHeight = dH * 0.85;
@@ -2433,11 +2440,12 @@
             </div>
 
             <!-- Webcam Feed Viewport -->
-            <div id="videoContainer" style="position: relative; width: 100%; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 auto; max-height: 40vh;">
-                <div id="videoWrapper" style="position: relative; display: flex; justify-content: center; align-items: center; max-width: 100%; max-height: 100%;">
-                    <video id="scannerVideo" autoplay playsinline style="display: block; max-width: 100%; max-height: 40vh; width: auto; height: auto;"></video>
-                    <!-- ManaBOX-like Vertical Guide Box -->
-                    <div id="scannerGuideBox" class="scanner-guide-box">
+            <div id="videoContainer" style="position: relative; width: 100%; height: 320px; max-height: 40vh; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0 auto;">
+                <video id="scannerVideo" autoplay playsinline style="display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; margin: 0 auto;"></video>
+                <!-- Overlay container that matches the exact bounding rect of the active video stream -->
+                <div id="scannerOverlayContainer" style="position: absolute; overflow: hidden; pointer-events: none; z-index: 2; border-radius: 10px;">
+                    <!-- ManaBOX-like Vertical Guide Box centered inside the overlay -->
+                    <div id="scannerGuideBox" class="scanner-guide-box" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
                         <div style="position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-purple), transparent); box-shadow: 0 0 10px var(--accent-purple); animation: scanLineMove 2.5s linear infinite; pointer-events: none;"></div>
                         
                         <!-- Guide indicators -->
